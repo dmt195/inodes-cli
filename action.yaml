@@ -1,0 +1,61 @@
+name: "Image Nodes CLI"
+description: "Run Image Nodes pipelines in CI/CD"
+branding:
+  icon: "image"
+  color: "purple"
+
+inputs:
+  version:
+    description: "CLI version to install (e.g. v1.0.0, or 'latest')"
+    required: false
+    default: "latest"
+  api-key:
+    description: "Image Nodes API key"
+    required: true
+  base-url:
+    description: "API base URL"
+    required: false
+    default: "https://imagenodes.com"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install inodes CLI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        REPO="dmt195/inodes-cli"
+
+        # Determine OS and arch
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+
+        # Resolve version
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+        fi
+        VERSION_NUM="${VERSION#v}"
+
+        # Download and extract
+        ARCHIVE="inodes_${OS}_${ARCH}.tar.gz"
+        URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE}"
+        echo "Downloading inodes ${VERSION} for ${OS}/${ARCH}..."
+        curl -sL "$URL" -o "/tmp/${ARCHIVE}"
+        tar -xzf "/tmp/${ARCHIVE}" -C /tmp
+        mv /tmp/inodes /usr/local/bin/inodes
+        chmod +x /usr/local/bin/inodes
+        echo "Installed $(inodes version)"
+
+    - name: Verify inodes auth
+      shell: bash
+      env:
+        INODES_API_KEY: ${{ inputs.api-key }}
+        INODES_BASE_URL: ${{ inputs.base-url }}
+      run: inodes --api-key "$INODES_API_KEY" --base-url "$INODES_BASE_URL" list > /dev/null
