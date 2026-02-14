@@ -25,8 +25,9 @@ func NewRunCmd() *cobra.Command {
 
 Interactive mode (default): prompts for missing parameters.
 CI/CD mode (--no-prompt): uses flags and defaults only.`,
-		Args: cobra.ExactArgs(1),
-		RunE: runPipeline,
+		Args:              cobra.ExactArgs(1),
+		RunE:              runPipeline,
+		ValidArgsFunction: completePipelineIDs,
 	}
 	cmd.Flags().StringArray("param", nil, "Value parameter (key=value, repeatable)")
 	cmd.Flags().StringArray("image", nil, "Image parameter (key=path, repeatable)")

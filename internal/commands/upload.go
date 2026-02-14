@@ -13,10 +13,11 @@ import (
 
 func NewUploadCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "upload <file>",
-		Short: "Upload an ephemeral image (expires in 24h)",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runUpload,
+		Use:               "upload <file>",
+		Short:             "Upload an ephemeral image (expires in 24h)",
+		Args:              cobra.ExactArgs(1),
+		RunE:              runUpload,
+		ValidArgsFunction: completeImageFiles,
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")
 	return cmd

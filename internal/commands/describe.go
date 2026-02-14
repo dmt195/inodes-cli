@@ -9,10 +9,11 @@ import (
 
 func NewDescribeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "describe <pipeline-id>",
-		Short: "Show pipeline parameters",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runDescribe,
+		Use:               "describe <pipeline-id>",
+		Short:             "Show pipeline parameters",
+		Args:              cobra.ExactArgs(1),
+		RunE:              runDescribe,
+		ValidArgsFunction: completePipelineIDs,
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")
 	return cmd

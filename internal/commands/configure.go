@@ -13,18 +13,20 @@ import (
 )
 
 func NewConfigureCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "Set API key and base URL",
+		Short: "Set API key",
 		RunE:  runConfigure,
 	}
+	cmd.Flags().String("base-url", "", "Override API base URL (for dev/local, e.g. http://localhost:8081)")
+	return cmd
 }
 
 func runConfigure(cmd *cobra.Command, args []string) error {
 	cfg, _ := config.Load("", "")
 
 	apiKey := cfg.APIKey
-	baseURL := cfg.BaseURL
+	baseURLFlag, _ := cmd.Flags().GetString("base-url")
 
 	if output.IsInteractive() {
 		form := huh.NewForm(
@@ -34,10 +36,6 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 					Description("Your Image Nodes API key").
 					Value(&apiKey).
 					EchoMode(huh.EchoModePassword),
-				huh.NewInput().
-					Title("Base URL").
-					Description("API server URL").
-					Value(&baseURL),
 			),
 		)
 
@@ -45,17 +43,18 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	} else {
-		// Non-interactive: require env vars or flags
 		if apiKey == "" {
 			return fmt.Errorf("API key required. Set INODES_API_KEY or run interactively")
 		}
 	}
 
 	cfg.APIKey = apiKey
-	cfg.BaseURL = baseURL
+	if baseURLFlag != "" {
+		cfg.BaseURL = baseURLFlag
+	}
 
 	// Test connectivity
-	fmt.Fprintf(os.Stderr, "Testing connection... ")
+	fmt.Fprintf(os.Stderr, "Testing connection to %s... ", cfg.BaseURL)
 	c := client.New(cfg.BaseURL, cfg.APIKey)
 	if err := c.TestAuth(); err != nil {
 		fmt.Fprintln(os.Stderr, tui.SymbolCross)
