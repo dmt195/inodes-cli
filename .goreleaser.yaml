@@ -22,14 +22,25 @@ builds:
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats: ['tar.gz']
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ['zip']
 
 checksum:
   name_template: "checksums.txt"
+
+homebrew_casks:
+  - name: inodes
+    description: "CLI for the Image Nodes image processing API"
+    homepage: "https://imagenodes.com"
+    binaries:
+      - inodes
+    repository:
+      owner: dmt195
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
 
 changelog:
   sort: asc
