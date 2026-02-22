@@ -106,6 +106,31 @@ func (c *Client) EvaluatePipeline(id string, params map[string]any, base64 bool)
 	return &report, nil
 }
 
+// DiffAssessment runs a diff assessment between API and editor mode for a pipeline
+func (c *Client) DiffAssessment(id string) (*DiffAssessmentResult, error) {
+	path := fmt.Sprintf("/api/v1/pipelines/%s/diff-assessment", id)
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := decodeJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result DiffAssessmentResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing diff assessment: %w", err)
+	}
+	return &result, nil
+}
+
 // DownloadFile downloads a file from a URL (relative or absolute) and returns the bytes
 func (c *Client) DownloadFile(path string) ([]byte, string, error) {
 	req, err := http.NewRequest(http.MethodGet, c.ResolveURL(path), nil)

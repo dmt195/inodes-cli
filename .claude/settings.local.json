@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:goreleaser.com)"
+      "WebFetch(domain:goreleaser.com)",
+      "Bash(gh api:*)",
+      "Bash(tail:*)",
+      "Bash(gh repo:*)",
+      "Bash(make test:*)",
+      "Bash(make format && make lint 2>&1)",
+      "Bash(curl:*)",
+      "Bash(make build:*)",
+      "Bash(make lint:*)"
     ]
   }
 }

@@ -15,6 +15,7 @@ func main() {
 		Use:           "inodes",
 		Short:         "Image Nodes CLI — build and run image processing pipelines",
 		Long:          "A command-line tool for the Image Nodes API. Discover pipelines, upload images, execute pipelines, and download results.",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -29,6 +30,7 @@ func main() {
 	root.AddCommand(commands.NewDescribeCmd())
 	root.AddCommand(commands.NewRunCmd())
 	root.AddCommand(commands.NewUploadCmd())
+	root.AddCommand(commands.NewDiffCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version",

@@ -31,17 +31,6 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-homebrew_casks:
-  - name: inodes
-    description: "CLI for the Image Nodes image processing API"
-    homepage: "https://imagenodes.com"
-    binaries:
-      - inodes
-    repository:
-      owner: dmt195
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-
 changelog:
   sort: asc
   filters:

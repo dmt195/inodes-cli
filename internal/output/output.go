@@ -109,6 +109,19 @@ func PrintPipelineDescription(desc *client.PipelineDescription) {
 	fmt.Printf("%s %s\n", tui.Muted.Render("Pipeline ID:"), desc.ID)
 }
 
+// PrintDiffResult prints the result of a diff assessment
+func PrintDiffResult(r *client.DiffAssessmentResult) {
+	fmt.Println(tui.Subtitle.Render("── Diff Assessment ──"))
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("Avg Diff"), fmt.Sprintf("%.4f", r.AvgDiff))
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("Max Diff"), fmt.Sprintf("%d", r.MaxDiff))
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("API Resolution"), fmt.Sprintf("%dx%d", r.ApiWidth, r.ApiHeight))
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("Editor Resolution"), fmt.Sprintf("%dx%d", r.EditorWidth, r.EditorHeight))
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("Scale Factor"), fmt.Sprintf("%.4f", r.ScaleFactor))
+	fmt.Fprintf(w, "%s\t%s\n", tui.Bold.Render("Pixels Compared"), fmt.Sprintf("%d", r.PixelsCompared))
+	w.Flush()
+}
+
 // PrintRunResult prints the result summary of a pipeline execution
 func PrintRunResult(report *client.PipelineReport, outputPath string) {
 	duration := report.TotalProcessingTime / time.Millisecond

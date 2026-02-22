@@ -84,6 +84,18 @@ type NodePerfEntry struct {
 	ProcessingTime time.Duration `json:"processing_time"`
 }
 
+// DiffAssessmentResult is the result of a diff assessment between API and editor mode
+type DiffAssessmentResult struct {
+	AvgDiff        float64 `json:"avgDiff"`
+	MaxDiff        int     `json:"maxDiff"`
+	ApiWidth       int     `json:"apiWidth"`
+	ApiHeight      int     `json:"apiHeight"`
+	EditorWidth    int     `json:"editorWidth"`
+	EditorHeight   int     `json:"editorHeight"`
+	ScaleFactor    float64 `json:"scaleFactor"`
+	PixelsCompared int     `json:"pixelsCompared"`
+}
+
 // EphemeralUploadResponse is the data from uploading an ephemeral asset
 type EphemeralUploadResponse struct {
 	ID        string `json:"id"`
