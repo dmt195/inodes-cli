@@ -15,11 +15,37 @@ import (
 
 var version = "dev"
 
+const serverInstructions = `Image Nodes MCP Server — image processing via the Image Nodes API.
+
+## Stored Pipelines (all plans)
+Use these tools to run pre-built pipelines saved in a user's account:
+1. list_pipelines → discover available pipelines
+2. describe_pipeline → get the parameter schema (inputs, types, defaults)
+3. upload_image → upload a local image file to get an asset UUID
+4. run_pipeline → execute with parameters, get result image
+
+## Dynamic Pipelines (paid plans)
+Build and execute custom pipelines on the fly from JSON:
+1. get_node_schema → discover all available node types and their parameters
+2. validate_pipeline → check a pipeline definition for errors
+3. estimate_pipeline_cost → estimate cost before executing
+4. evaluate_pipeline → execute the pipeline and get the result image
+
+## Authentication
+Requires an API key set via the INODES_API_KEY environment variable
+or configured with 'inodes configure'.`
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
+		printHelp()
+		return
+	}
+
 	mcpServer := server.NewMCPServer(
 		"imagenodes-mcp-server",
 		version,
 		server.WithToolCapabilities(true),
+		server.WithInstructions(serverInstructions),
 	)
 
 	mcpServer.AddTool(mcp.NewTool("list_pipelines",
@@ -98,6 +124,42 @@ func main() {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func printHelp() {
+	fmt.Printf(`Image Nodes MCP Server %s
+
+An MCP (Model Context Protocol) server for the Image Nodes image processing API.
+Communicates over stdio using JSON-RPC.
+
+Tools provided:
+
+  Stored Pipelines (all plans):
+    list_pipelines         List available image processing pipelines
+    describe_pipeline      Get parameter schema for a pipeline
+    run_pipeline           Execute a stored pipeline with parameters
+    upload_image           Upload a local image as an ephemeral asset
+
+  Dynamic Pipelines (paid plans):
+    get_node_schema        Discover available node types and parameters
+    validate_pipeline      Validate a pipeline JSON definition
+    estimate_pipeline_cost Estimate execution cost
+    evaluate_pipeline      Execute a custom pipeline from JSON
+
+Configuration:
+  Set INODES_API_KEY as an environment variable, or run 'inodes configure'.
+  Optionally set INODES_BASE_URL to override the default API endpoint.
+
+Usage with Claude Desktop:
+  {
+    "mcpServers": {
+      "imagenodes": {
+        "command": "%s",
+        "env": { "INODES_API_KEY": "your-key" }
+      }
+    }
+  }
+`, version, os.Args[0])
 }
 
 // newClient creates an API client from config, returning an error if no API key is set.
