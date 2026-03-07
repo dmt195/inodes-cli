@@ -1,10 +1,16 @@
-.PHONY: build test clean install format lint
+.PHONY: build build-mcp test clean install format lint
 
 BINARY_NAME=inodes
+MCP_BINARY_NAME=inodes-mcp-server
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/$(BINARY_NAME) .
+
+build-mcp:
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/$(MCP_BINARY_NAME) ./cmd/mcp-server
+
+build-all: build build-mcp
 
 test:
 	go test ./... -v
