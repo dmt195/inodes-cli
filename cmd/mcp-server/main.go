@@ -62,6 +62,38 @@ func main() {
 		),
 	), handleUploadImage)
 
+	// LLM Integration endpoints (paid plans) — dynamic pipeline creation
+	mcpServer.AddTool(mcp.NewTool("get_node_schema",
+		mcp.WithDescription("Discover all available image processing node types and their parameters. Use this to understand what nodes can be used when building a custom pipeline definition. Returns node types, their inputs, outputs, and configurable properties."),
+	), handleGetNodeSchema)
+
+	mcpServer.AddTool(mcp.NewTool("validate_pipeline",
+		mcp.WithDescription("Validate a custom pipeline JSON structure without executing it. Returns whether the pipeline is valid and any errors found. Use this before evaluate_pipeline to check for issues."),
+		mcp.WithObject("pipeline",
+			mcp.Description("The pipeline definition as a JSON object"),
+			mcp.Required(),
+		),
+	), handleValidatePipeline)
+
+	mcpServer.AddTool(mcp.NewTool("estimate_pipeline_cost",
+		mcp.WithDescription("Estimate the cost (in processing units) of executing a custom pipeline without running it."),
+		mcp.WithObject("pipeline",
+			mcp.Description("The pipeline definition as a JSON object"),
+			mcp.Required(),
+		),
+	), handleEstimatePipelineCost)
+
+	mcpServer.AddTool(mcp.NewTool("evaluate_pipeline",
+		mcp.WithDescription("Execute a custom pipeline defined as JSON. Unlike run_pipeline (which runs a stored pipeline by ID), this executes an ad-hoc pipeline definition directly. Requires a paid subscription. Use get_node_schema to discover available nodes, and validate_pipeline to check your definition first."),
+		mcp.WithObject("pipeline",
+			mcp.Description("The pipeline definition as a JSON object"),
+			mcp.Required(),
+		),
+		mcp.WithBoolean("base64",
+			mcp.Description("If true, return the image as base64 instead of a URL (default false)"),
+		),
+	), handleEvaluatePipeline)
+
 	if err := server.ServeStdio(mcpServer); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
@@ -191,6 +223,111 @@ func handleUploadImage(_ context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	return jsonResult(result)
+}
+
+func handleGetNodeSchema(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	result, err := c.GetSchemaNodes()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	return jsonResult(result)
+}
+
+func handleValidatePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	args := request.GetArguments()
+	pipeline, ok := args["pipeline"].(map[string]any)
+	if !ok {
+		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
+	}
+
+	result, err := c.ValidatePipeline(pipeline)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	return jsonResult(result)
+}
+
+func handleEstimatePipelineCost(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	args := request.GetArguments()
+	pipeline, ok := args["pipeline"].(map[string]any)
+	if !ok {
+		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
+	}
+
+	result, err := c.EstimatePipelineCost(pipeline)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	return jsonResult(result)
+}
+
+func handleEvaluatePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	args := request.GetArguments()
+	pipeline, ok := args["pipeline"].(map[string]any)
+	if !ok {
+		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
+	}
+
+	base64Flag := false
+	if b, ok := args["base64"].(bool); ok {
+		base64Flag = b
+	}
+
+	report, err := c.EvaluatePipelineJSON(pipeline, base64Flag)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	if base64Flag && report.ImageDetails.ImageAsBase64 != "" {
+		mimeType := "image/png"
+		if report.ImageDetails.Format != "" {
+			mimeType = "image/" + report.ImageDetails.Format
+		}
+
+		summary := fmt.Sprintf("Pipeline executed successfully. %dx%d %s, %d units billed, %.2fs processing time.",
+			report.ImageDetails.Width, report.ImageDetails.Height,
+			report.ImageDetails.Format, report.TotalUnitsBillable,
+			report.TotalProcessingTime.Seconds())
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.ImageContent{
+					Type:     "image",
+					Data:     report.ImageDetails.ImageAsBase64,
+					MIMEType: mimeType,
+				},
+				mcp.TextContent{
+					Type: "text",
+					Text: summary,
+				},
+			},
+		}, nil
+	}
+
+	return jsonResult(report)
 }
 
 // --- helpers ---

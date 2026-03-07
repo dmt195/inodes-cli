@@ -101,3 +101,44 @@ type EphemeralUploadResponse struct {
 	ID        string `json:"id"`
 	ExpiresAt string `json:"expires_at"`
 }
+
+// NodeSchema describes an available node type and its parameters
+type NodeSchema struct {
+	Type        string         `json:"type"`
+	Description string         `json:"description,omitempty"`
+	Category    string         `json:"category,omitempty"`
+	Inputs      []NodeInput    `json:"inputs,omitempty"`
+	Outputs     []NodeOutput   `json:"outputs,omitempty"`
+	Properties  map[string]any `json:"properties,omitempty"`
+}
+
+// NodeInput describes a node input slot
+type NodeInput struct {
+	Name     string `json:"name"`
+	DataType string `json:"data_type"`
+	Required bool   `json:"required"`
+}
+
+// NodeOutput describes a node output slot
+type NodeOutput struct {
+	Name     string `json:"name"`
+	DataType string `json:"data_type"`
+}
+
+// SchemaNodesResponse is the response from the schema/nodes endpoint
+type SchemaNodesResponse struct {
+	Nodes []NodeSchema `json:"nodes"`
+}
+
+// ValidateResponse is the response from the pipeline/validate endpoint
+type ValidateResponse struct {
+	Valid  bool     `json:"valid"`
+	Errors []string `json:"errors,omitempty"`
+}
+
+// EstimateCostResponse is the response from the pipeline/estimate-cost endpoint
+type EstimateCostResponse struct {
+	EstimatedUnits int    `json:"estimated_units"`
+	Currency       string `json:"currency,omitempty"`
+	Details        any    `json:"details,omitempty"`
+}
