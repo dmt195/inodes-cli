@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -52,6 +53,15 @@ func (c *Client) get(path string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	return c.do(req)
+}
+
+func (c *Client) post(path string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
 	return c.do(req)
 }
 
