@@ -7,8 +7,24 @@ before:
     - go mod tidy
 
 builds:
-  - main: .
+  - id: inodes
+    main: .
     binary: inodes
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: inodes-mcp-server
+    main: ./cmd/mcp-server
+    binary: inodes-mcp-server
     ldflags:
       - -s -w -X main.version={{.Version}}
     env:
