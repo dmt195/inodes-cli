@@ -122,6 +122,76 @@ func PrintDiffResult(r *client.DiffAssessmentResult) {
 	w.Flush()
 }
 
+// PrintNodeSchemas prints the available node types
+func PrintNodeSchemas(schema *client.SchemaNodesResponse) {
+	if len(schema.Nodes) == 0 {
+		fmt.Println(tui.Muted.Render("No node types found."))
+		return
+	}
+
+	fmt.Println(tui.Title.Render(fmt.Sprintf("%d Node Types", len(schema.Nodes))))
+	fmt.Println()
+
+	// Group by category
+	categories := make(map[string][]client.NodeSchema)
+	var order []string
+	for _, n := range schema.Nodes {
+		cat := n.Category
+		if cat == "" {
+			cat = "Other"
+		}
+		if _, exists := categories[cat]; !exists {
+			order = append(order, cat)
+		}
+		categories[cat] = append(categories[cat], n)
+	}
+
+	for _, cat := range order {
+		nodes := categories[cat]
+		fmt.Println(tui.Subtitle.Render(fmt.Sprintf("── %s ──", cat)))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		for _, n := range nodes {
+			desc := n.Description
+			if len(desc) > 60 {
+				desc = desc[:57] + "..."
+			}
+			fmt.Fprintf(w, "  %s\t%s\n", tui.Bold.Render(n.Type), desc)
+		}
+		w.Flush()
+		fmt.Println()
+	}
+}
+
+// PrintValidateResult prints pipeline validation results
+func PrintValidateResult(r *client.ValidateResponse) {
+	if r.Valid {
+		fmt.Printf("%s Pipeline is valid\n", tui.SymbolCheck)
+	} else {
+		fmt.Printf("%s Pipeline is invalid\n", tui.SymbolCross)
+		for _, e := range r.Errors {
+			fmt.Printf("  %s %s\n", tui.SymbolArrow, e.Message)
+		}
+	}
+}
+
+// PrintEstimateResult prints pipeline cost estimation
+func PrintEstimateResult(r *client.EstimateCostResponse) {
+	fmt.Println(tui.Subtitle.Render("── Cost Estimate ──"))
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(w, "%s\t%d credits\n", tui.Bold.Render("Estimated cost"), r.EstimatedCost)
+	fmt.Fprintf(w, "%s\t%d\n", tui.Bold.Render("Node count"), r.NodeCount)
+	w.Flush()
+	if len(r.Breakdown) > 0 {
+		fmt.Println()
+		fmt.Println(tui.Subtitle.Render("── Breakdown ──"))
+		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		for nodeType, cost := range r.Breakdown {
+			fmt.Fprintf(w, "  %s\t%d\n", nodeType, cost)
+		}
+		w.Flush()
+	}
+}
+
 // PrintRunResult prints the result summary of a pipeline execution
 func PrintRunResult(report *client.PipelineReport, outputPath string) {
 	duration := report.TotalProcessingTime / time.Millisecond

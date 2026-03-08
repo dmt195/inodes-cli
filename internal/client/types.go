@@ -132,13 +132,28 @@ type SchemaNodesResponse struct {
 
 // ValidateResponse is the response from the pipeline/validate endpoint
 type ValidateResponse struct {
-	Valid  bool     `json:"valid"`
-	Errors []string `json:"errors,omitempty"`
+	Valid  bool              `json:"valid"`
+	Errors []ValidationError `json:"errors,omitempty"`
+}
+
+// ValidationError represents a single validation error
+type ValidationError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// EvaluateJSONResponse is the response from the pipeline/evaluate endpoint
+type EvaluateJSONResponse struct {
+	Success  bool           `json:"success"`
+	Output   string         `json:"output,omitempty"`
+	Cost     int            `json:"cost"`
+	Error    string         `json:"error,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // EstimateCostResponse is the response from the pipeline/estimate-cost endpoint
 type EstimateCostResponse struct {
-	EstimatedUnits int    `json:"estimated_units"`
-	Currency       string `json:"currency,omitempty"`
-	Details        any    `json:"details,omitempty"`
+	EstimatedCost int            `json:"estimated_cost"`
+	NodeCount     int            `json:"node_count"`
+	Breakdown     map[string]int `json:"breakdown,omitempty"`
 }

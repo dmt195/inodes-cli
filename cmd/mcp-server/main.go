@@ -358,28 +358,24 @@ func handleEvaluatePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 		base64Flag = b
 	}
 
-	report, err := c.EvaluatePipelineJSON(pipeline, base64Flag)
+	result, err := c.EvaluatePipelineJSON(pipeline, base64Flag)
 	if err != nil {
 		return errorResult(err), nil
 	}
 
-	if base64Flag && report.ImageDetails.ImageAsBase64 != "" {
-		mimeType := "image/png"
-		if report.ImageDetails.Format != "" {
-			mimeType = "image/" + report.ImageDetails.Format
-		}
+	if !result.Success {
+		return errorResult(fmt.Errorf("pipeline evaluation failed: %s", result.Error)), nil
+	}
 
-		summary := fmt.Sprintf("Pipeline executed successfully. %dx%d %s, %d units billed, %.2fs processing time.",
-			report.ImageDetails.Width, report.ImageDetails.Height,
-			report.ImageDetails.Format, report.TotalUnitsBillable,
-			report.TotalProcessingTime.Seconds())
+	if base64Flag && result.Output != "" {
+		summary := fmt.Sprintf("Pipeline executed successfully. %d credits used.", result.Cost)
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				mcp.ImageContent{
 					Type:     "image",
-					Data:     report.ImageDetails.ImageAsBase64,
-					MIMEType: mimeType,
+					Data:     result.Output,
+					MIMEType: "image/png",
 				},
 				mcp.TextContent{
 					Type: "text",
@@ -389,7 +385,7 @@ func handleEvaluatePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 		}, nil
 	}
 
-	return jsonResult(report)
+	return jsonResult(result)
 }
 
 // --- helpers ---

@@ -30,6 +30,10 @@ func main() {
 	root.AddCommand(commands.NewDescribeCmd())
 	root.AddCommand(commands.NewRunCmd())
 	root.AddCommand(commands.NewUploadCmd())
+	root.AddCommand(commands.NewSchemaCmd())
+	root.AddCommand(commands.NewValidateCmd())
+	root.AddCommand(commands.NewEstimateCmd())
+	root.AddCommand(commands.NewEvaluateCmd())
 	root.AddCommand(commands.NewDiffCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
