@@ -30,6 +30,7 @@ Build and execute custom pipelines on the fly from JSON:
 2. validate_pipeline → check a pipeline definition for errors
 3. estimate_pipeline_cost → estimate cost before executing
 4. evaluate_pipeline → execute the pipeline and get the result image
+5. save_pipeline → save a pipeline definition to the user's account
 
 ## Authentication
 Requires an API key set via the INODES_API_KEY environment variable
@@ -109,6 +110,21 @@ func main() {
 		),
 	), handleEstimatePipelineCost)
 
+	mcpServer.AddTool(mcp.NewTool("save_pipeline",
+		mcp.WithDescription("Save a custom pipeline definition to the user's account. Validates the pipeline before saving. Returns the pipeline ID and convenience URLs for evaluating and describing the saved pipeline. Requires a paid subscription."),
+		mcp.WithString("name",
+			mcp.Description("Name for the saved pipeline"),
+			mcp.Required(),
+		),
+		mcp.WithString("description",
+			mcp.Description("Optional description of what the pipeline does"),
+		),
+		mcp.WithObject("pipeline",
+			mcp.Description("The pipeline definition as a JSON object (nodes, values, connectionMapFwd, connectionMapRev)"),
+			mcp.Required(),
+		),
+	), handleSavePipeline)
+
 	mcpServer.AddTool(mcp.NewTool("evaluate_pipeline",
 		mcp.WithDescription("Execute a custom pipeline defined as JSON. Unlike run_pipeline (which runs a stored pipeline by ID), this executes an ad-hoc pipeline definition directly. Requires a paid subscription. Use get_node_schema to discover available nodes, and validate_pipeline to check your definition first."),
 		mcp.WithObject("pipeline",
@@ -145,6 +161,7 @@ Tools provided:
     validate_pipeline      Validate a pipeline JSON definition
     estimate_pipeline_cost Estimate execution cost
     evaluate_pipeline      Execute a custom pipeline from JSON
+    save_pipeline          Save a pipeline definition to your account
 
 Configuration:
   Set INODES_API_KEY as an environment variable, or run 'inodes configure'.
@@ -383,6 +400,36 @@ func handleEvaluatePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 				},
 			},
 		}, nil
+	}
+
+	return jsonResult(result)
+}
+
+func handleSavePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	name, err := request.RequireString("name")
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	args := request.GetArguments()
+	description := ""
+	if d, ok := args["description"].(string); ok {
+		description = d
+	}
+
+	pipeline, ok := args["pipeline"].(map[string]any)
+	if !ok {
+		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
+	}
+
+	result, err := c.SavePipeline(name, description, pipeline)
+	if err != nil {
+		return errorResult(err), nil
 	}
 
 	return jsonResult(result)

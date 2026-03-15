@@ -78,6 +78,35 @@ func (c *Client) EstimatePipelineCost(pipeline map[string]any) (*EstimateCostRes
 	return &result, nil
 }
 
+// SavePipeline saves a pipeline definition to the user's account
+func (c *Client) SavePipeline(name, description string, pipeline map[string]any) (*SavePipelineResponse, error) {
+	req := SavePipelineRequest{
+		Name:        name,
+		Description: description,
+		Pipeline:    pipeline,
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("encoding save request: %w", err)
+	}
+
+	resp, err := c.post("/api/v1/pipeline/save", body)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := decodeJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SavePipelineResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing save result: %w", err)
+	}
+	return &result, nil
+}
+
 // EvaluatePipelineJSON executes a pipeline defined inline as JSON
 func (c *Client) EvaluatePipelineJSON(pipeline map[string]any, base64 bool) (*EvaluateJSONResponse, error) {
 	body, err := json.Marshal(pipeline)

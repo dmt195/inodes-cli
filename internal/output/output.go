@@ -192,6 +192,14 @@ func PrintEstimateResult(r *client.EstimateCostResponse) {
 	}
 }
 
+// PrintSaveResult prints the result of saving a pipeline
+func PrintSaveResult(r *client.SavePipelineResponse) {
+	fmt.Printf("%s Pipeline saved: %s\n", tui.SymbolCheck, tui.Bold.Render(r.Name))
+	fmt.Printf("  %s ID:       %s\n", tui.SymbolArrow, r.ID)
+	fmt.Printf("  %s Evaluate: %s\n", tui.SymbolArrow, r.EvaluateURL)
+	fmt.Printf("  %s Describe: %s\n", tui.SymbolArrow, r.DescribeURL)
+}
+
 // PrintRunResult prints the result summary of a pipeline execution
 func PrintRunResult(report *client.PipelineReport, outputPath string) {
 	duration := report.TotalProcessingTime / time.Millisecond

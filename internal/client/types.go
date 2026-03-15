@@ -157,3 +157,18 @@ type EstimateCostResponse struct {
 	NodeCount     int            `json:"node_count"`
 	Breakdown     map[string]int `json:"breakdown,omitempty"`
 }
+
+// SavePipelineRequest is the request body for saving a pipeline
+type SavePipelineRequest struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Pipeline    map[string]any `json:"pipeline"`
+}
+
+// SavePipelineResponse is the data payload from saving a pipeline
+type SavePipelineResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	EvaluateURL string `json:"evaluate_url"`
+	DescribeURL string `json:"describe_url"`
+}

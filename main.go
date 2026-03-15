@@ -34,6 +34,7 @@ func main() {
 	root.AddCommand(commands.NewValidateCmd())
 	root.AddCommand(commands.NewEstimateCmd())
 	root.AddCommand(commands.NewEvaluateCmd())
+	root.AddCommand(commands.NewSaveCmd())
 	root.AddCommand(commands.NewDiffCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
