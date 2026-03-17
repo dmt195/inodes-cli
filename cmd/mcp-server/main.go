@@ -330,7 +330,7 @@ func handleValidatePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
 	}
 
-	result, err := c.ValidatePipeline(pipeline)
+	result, err := c.ValidatePipeline(wrapPipeline(pipeline))
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -350,7 +350,7 @@ func handleEstimatePipelineCost(_ context.Context, request mcp.CallToolRequest) 
 		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
 	}
 
-	result, err := c.EstimatePipelineCost(pipeline)
+	result, err := c.EstimatePipelineCost(wrapPipeline(pipeline))
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -375,7 +375,7 @@ func handleEvaluatePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 		base64Flag = b
 	}
 
-	result, err := c.EvaluatePipelineJSON(pipeline, base64Flag)
+	result, err := c.EvaluatePipelineJSON(wrapPipeline(pipeline), base64Flag)
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -436,6 +436,15 @@ func handleSavePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.Ca
 }
 
 // --- helpers ---
+
+// wrapPipeline wraps a raw pipeline object in {"pipeline": ...} if needed.
+// The API expects this envelope; the MCP tool schema accepts the raw pipeline object.
+func wrapPipeline(pipeline map[string]any) map[string]any {
+	if _, ok := pipeline["pipeline"]; ok {
+		return pipeline
+	}
+	return map[string]any{"pipeline": pipeline}
+}
 
 func errorResult(err error) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
