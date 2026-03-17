@@ -21,7 +21,7 @@ const serverInstructions = `Image Nodes MCP Server — image processing via the 
 Use these tools to run pre-built pipelines saved in a user's account:
 1. list_pipelines → discover available pipelines
 2. describe_pipeline → get the parameter schema (inputs, types, defaults)
-3. upload_image → upload a local image file to get an asset UUID
+3. upload_image → upload a local image file to get an asset ID
 4. run_pipeline → execute with parameters, get result image
 
 ## Dynamic Pipelines (paid plans)
@@ -62,7 +62,7 @@ func main() {
 	mcpServer.AddTool(mcp.NewTool("describe_pipeline",
 		mcp.WithDescription("Get the parameter schema for a pipeline. Returns value parameters (with types and defaults) and image parameters (with required flags). Use this before run_pipeline to understand what inputs are needed."),
 		mcp.WithString("pipeline_id",
-			mcp.Description("The pipeline UUID"),
+			mcp.Description("The pipeline ID"),
 			mcp.Required(),
 		),
 	), handleDescribePipeline)
@@ -70,11 +70,11 @@ func main() {
 	mcpServer.AddTool(mcp.NewTool("run_pipeline",
 		mcp.WithDescription("Execute an image processing pipeline with the given parameters. Returns the result image (as a URL or base64) along with processing time and billing info. Use describe_pipeline first to learn the required parameters."),
 		mcp.WithString("pipeline_id",
-			mcp.Description("The pipeline UUID"),
+			mcp.Description("The pipeline ID"),
 			mcp.Required(),
 		),
 		mcp.WithObject("params",
-			mcp.Description("Key-value parameters for the pipeline (from describe_pipeline). Image params should be asset UUIDs (from upload_image)."),
+			mcp.Description("Key-value parameters for the pipeline (from describe_pipeline). Image params should be asset IDs (from upload_image)."),
 		),
 		mcp.WithBoolean("base64",
 			mcp.Description("If true, return the image as base64 instead of a URL (default false)"),
@@ -82,7 +82,7 @@ func main() {
 	), handleRunPipeline)
 
 	mcpServer.AddTool(mcp.NewTool("upload_image",
-		mcp.WithDescription("Upload a local image file as an ephemeral asset (expires in 24h). Returns an asset UUID that can be used as an image parameter in run_pipeline."),
+		mcp.WithDescription("Upload a local image file as an ephemeral asset (expires in 24h). Returns an asset ID that can be used as an image parameter in run_pipeline."),
 		mcp.WithString("file_path",
 			mcp.Description("Absolute path to the image file to upload"),
 			mcp.Required(),

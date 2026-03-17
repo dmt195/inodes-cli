@@ -15,7 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+// idRegex matches asset IDs (26-char ULIDs) to distinguish them from file paths.
+var idRegex = regexp.MustCompile(`^[0-9A-HJ-NP-TV-Za-hj-np-tv-z]{26}$`)
 
 func NewRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -91,7 +92,7 @@ func runPipeline(cmd *cobra.Command, args []string) error {
 
 	// Upload image files that are local paths
 	for key, val := range imageParams {
-		if uuidRegex.MatchString(val) {
+		if idRegex.MatchString(val) {
 			// Already an asset ID
 			params[key] = val
 			continue
@@ -226,7 +227,7 @@ func promptForMissingParams(desc *client.PipelineDescription, params map[string]
 				return
 			}
 			// Upload if it's a file path
-			if !uuidRegex.MatchString(*v) {
+			if !idRegex.MatchString(*v) {
 				fmt.Fprintf(os.Stderr, "Uploading %s... ", filepath.Base(*v))
 				result, err := cl.UploadEphemeral(*v)
 				if err != nil {
