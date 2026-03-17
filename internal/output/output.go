@@ -200,6 +200,24 @@ func PrintSaveResult(r *client.SavePipelineResponse) {
 	fmt.Printf("  %s Describe: %s\n", tui.SymbolArrow, r.DescribeURL)
 }
 
+// PrintPipelineExport prints a human-readable summary of an exported pipeline
+func PrintPipelineExport(p *client.PipelineFull) {
+	fmt.Println(tui.Title.Render(p.Name))
+	fmt.Printf("%s %s\n", tui.Muted.Render("Pipeline ID:"), p.ID)
+
+	if pd, ok := p.PipelineData["nodes"].(map[string]any); ok {
+		fmt.Printf("%s %d\n", tui.Muted.Render("Nodes:"), len(pd))
+	}
+	if conns, ok := p.PipelineData["connectionMapFwd"].(map[string]any); ok {
+		fmt.Printf("%s %d\n", tui.Muted.Render("Connections:"), len(conns))
+	}
+
+	fmt.Println()
+	fmt.Println(tui.Muted.Render("Use --json or -o <file> to export the full graph data."))
+	fmt.Println(tui.Muted.Render("  inodes export " + p.ID + " --json > pipeline.json"))
+	fmt.Println(tui.Muted.Render("  inodes export " + p.ID + " -o pipeline.json"))
+}
+
 // PrintRunResult prints the result summary of a pipeline execution
 func PrintRunResult(report *client.PipelineReport, outputPath string) {
 	duration := report.TotalProcessingTime / time.Millisecond

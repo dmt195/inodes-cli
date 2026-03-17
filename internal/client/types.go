@@ -33,6 +33,24 @@ type PipelineListResponse struct {
 	} `json:"meta"`
 }
 
+// PipelineFull represents a pipeline with its full graph data
+type PipelineFull struct {
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	LastImage    string         `json:"last_image,omitempty"`
+	CreatedAt    string         `json:"created_at,omitempty"`
+	UpdatedAt    string         `json:"updated_at,omitempty"`
+	UserID       int            `json:"user_id,omitempty"`
+	PipelineData map[string]any `json:"pipeline_data,omitempty"`
+	IsFavourite  bool           `json:"is_favourite"`
+	IsLocked     bool           `json:"is_locked"`
+}
+
+// PipelineFullResponse wraps PipelineFull for endpoints that return extra fields
+type PipelineFullResponse struct {
+	PipelineFull
+}
+
 // PipelineDescription describes a pipeline's API parameters
 type PipelineDescription struct {
 	ID            string               `json:"id"`

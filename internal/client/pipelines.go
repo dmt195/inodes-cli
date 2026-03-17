@@ -106,6 +106,26 @@ func (c *Client) EvaluatePipeline(id string, params map[string]any, base64 bool)
 	return &report, nil
 }
 
+// GetPipeline returns the full pipeline including graph data
+func (c *Client) GetPipeline(id string) (*PipelineFull, error) {
+	path := fmt.Sprintf("/api/v1/pipelines/%s", id)
+	resp, err := c.get(path)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := decodeJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result PipelineFullResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing pipeline: %w", err)
+	}
+	return &result.PipelineFull, nil
+}
+
 // DiffAssessment runs a diff assessment between API and editor mode for a pipeline
 func (c *Client) DiffAssessment(id string) (*DiffAssessmentResult, error) {
 	path := fmt.Sprintf("/api/v1/pipelines/%s/diff-assessment", id)
