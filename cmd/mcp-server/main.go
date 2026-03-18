@@ -21,8 +21,10 @@ const serverInstructions = `Image Nodes MCP Server — image processing via the 
 Use these tools to run pre-built pipelines saved in a user's account:
 1. list_pipelines → discover available pipelines
 2. describe_pipeline → get the parameter schema (inputs, types, defaults)
-3. upload_image → upload a local image file to get an asset ID
-4. run_pipeline → execute with parameters, get result image
+3. export_pipeline → get the full graph definition (nodes, values, connections)
+4. upload_image → upload a local image file to get an asset ID
+5. run_pipeline → execute with parameters, get result image
+6. delete_pipeline → remove a pipeline from the account
 
 ## Dynamic Pipelines (paid plans)
 Build and execute custom pipelines on the fly from JSON:
@@ -31,6 +33,15 @@ Build and execute custom pipelines on the fly from JSON:
 3. estimate_pipeline_cost → estimate cost before executing
 4. evaluate_pipeline → execute the pipeline and get the result image
 5. save_pipeline → save a pipeline definition to the user's account
+
+## Refactoring Pipelines
+To decompose a large pipeline into reusable nested sub-pipelines:
+1. export_pipeline → get the full graph of the existing pipeline
+2. Identify reusable sub-graphs (e.g. a screenshot rounding effect)
+3. save_pipeline → save each sub-graph as its own pipeline
+4. Build a composed pipeline using NodeType.nestedpipeline nodes
+5. validate_pipeline + evaluate_pipeline → test the composed pipeline
+6. delete_pipeline → clean up old pipelines if needed
 
 ## Authentication
 Requires an API key set via the INODES_API_KEY environment variable
@@ -66,6 +77,22 @@ func main() {
 			mcp.Required(),
 		),
 	), handleDescribePipeline)
+
+	mcpServer.AddTool(mcp.NewTool("export_pipeline",
+		mcp.WithDescription("Export the full graph definition (nodes, values, connections) of a pipeline. Returns the complete pipeline structure as JSON, suitable for analysis, modification, or re-saving. Use this to inspect how a pipeline is built, extract sub-graphs for nested pipeline refactoring, or duplicate/modify existing pipelines."),
+		mcp.WithString("pipeline_id",
+			mcp.Description("The pipeline ID"),
+			mcp.Required(),
+		),
+	), handleExportPipeline)
+
+	mcpServer.AddTool(mcp.NewTool("delete_pipeline",
+		mcp.WithDescription("Delete a pipeline from the user's account. This action cannot be undone."),
+		mcp.WithString("pipeline_id",
+			mcp.Description("The pipeline ID to delete"),
+			mcp.Required(),
+		),
+	), handleDeletePipeline)
 
 	mcpServer.AddTool(mcp.NewTool("run_pipeline",
 		mcp.WithDescription("Execute an image processing pipeline with the given parameters. Returns the result image (as a URL or base64) along with processing time and billing info. Use describe_pipeline first to learn the required parameters."),
@@ -153,8 +180,10 @@ Tools provided:
   Stored Pipelines (all plans):
     list_pipelines         List available image processing pipelines
     describe_pipeline      Get parameter schema for a pipeline
+    export_pipeline        Export full graph definition of a pipeline
     run_pipeline           Execute a stored pipeline with parameters
     upload_image           Upload a local image as an ephemeral asset
+    delete_pipeline        Delete a pipeline from your account
 
   Dynamic Pipelines (paid plans):
     get_node_schema        Discover available node types and parameters
@@ -226,6 +255,55 @@ func handleDescribePipeline(_ context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	return jsonResult(result)
+}
+
+func handleExportPipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	pipelineID, err := request.RequireString("pipeline_id")
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	pipeline, err := c.GetPipeline(pipelineID)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	if pipeline.PipelineData == nil {
+		return errorResult(fmt.Errorf("pipeline has no graph data")), nil
+	}
+
+	// Wrap as {"pipeline": {...}} for compatibility with save/validate/evaluate
+	wrapped := map[string]any{
+		"pipeline": pipeline.PipelineData,
+	}
+
+	return jsonResult(wrapped)
+}
+
+func handleDeletePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	pipelineID, err := request.RequireString("pipeline_id")
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	if err := c.DeletePipeline(pipelineID); err != nil {
+		return errorResult(err), nil
+	}
+
+	return jsonResult(map[string]string{
+		"deleted": pipelineID,
+		"status":  "ok",
+	})
 }
 
 func handleRunPipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

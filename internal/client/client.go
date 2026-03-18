@@ -56,6 +56,14 @@ func (c *Client) get(path string) (*http.Response, error) {
 	return c.do(req)
 }
 
+func (c *Client) delete(path string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodDelete, c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.do(req)
+}
+
 func (c *Client) post(path string, body []byte) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPost, c.baseURL+path, bytes.NewReader(body))
 	if err != nil {

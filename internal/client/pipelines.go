@@ -28,6 +28,18 @@ func (c *Client) ListPipelines(offset, pageSize int) (*PipelineListResponse, err
 	return &result, nil
 }
 
+// DeletePipeline deletes a pipeline by ID
+func (c *Client) DeletePipeline(id string) error {
+	path := fmt.Sprintf("/api/v1/pipelines/%s", id)
+	resp, err := c.delete(path)
+	if err != nil {
+		return err
+	}
+
+	_, err = decodeJSON(resp)
+	return err
+}
+
 // DescribePipeline returns the parameter description of a pipeline
 func (c *Client) DescribePipeline(id string) (*PipelineDescription, error) {
 	path := fmt.Sprintf("/api/v1/pipelines/%s/describe", id)

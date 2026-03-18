@@ -37,6 +37,7 @@ func main() {
 	root.AddCommand(commands.NewSaveCmd())
 	root.AddCommand(commands.NewDiffCmd())
 	root.AddCommand(commands.NewExportCmd())
+	root.AddCommand(commands.NewDeleteCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version",
