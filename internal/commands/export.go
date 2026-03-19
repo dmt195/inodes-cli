@@ -18,13 +18,16 @@ func NewExportCmd() *cobra.Command {
 		Short: "Export a pipeline's graph data as JSON",
 		Long: `Export the full graph definition (nodes, values, connections) of a pipeline.
 
+The pipeline-id is a 26-character ULID (e.g., 01KM2XGX2RPYRQ9F7V2ZP3F5TQ).
+Use 'inodes list' to find pipeline IDs.
+
 The output is formatted as {"pipeline": {...}} so it can be piped directly
 into 'inodes save', 'inodes validate', or 'inodes evaluate'.
 
 Examples:
-  inodes export 01ABC... --json > my-pipeline.json
-  inodes export 01ABC... --json | inodes save --name "Copy" -
-  inodes export 01ABC... -o my-pipeline.json`,
+  inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ > my-pipeline.json
+  inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ | inodes save --name "Copy" -
+  inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ -o my-pipeline.json`,
 		Args:              cobra.ExactArgs(1),
 		RunE:              runExport,
 		ValidArgsFunction: completePipelineIDs,

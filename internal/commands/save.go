@@ -15,9 +15,22 @@ func NewSaveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "save <pipeline.json>",
 		Short: "Save a pipeline definition to your account",
-		Long:  "Save a pipeline JSON definition to your Image Nodes account. The pipeline is validated before saving. Requires a paid subscription.",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runSave,
+		Long: `Save a pipeline JSON definition to your Image Nodes account.
+The pipeline is validated before saving. Requires a paid subscription.
+
+Pipeline JSON format:
+  The pipeline must contain nodes, values, and connection maps.
+  Node IDs must be 12-character alphanumeric strings (NanoIDs) with no
+  underscores, since connector IDs use the format "{nodeId}_{suffix}".
+  The special nodes "start" and "out" are also allowed.
+
+Nested pipelines:
+  To reference another pipeline as a node, use "NodeType.nestedpipeline"
+  and set the "{nodeId}_node_id" value to the target pipeline's ID (a
+  26-character ULID). The server automatically discovers the target
+  pipeline's API parameters and creates the required connector values.`,
+		Args: cobra.ExactArgs(1),
+		RunE: runSave,
 	}
 	cmd.Flags().String("name", "", "Pipeline name (required)")
 	cmd.Flags().String("description", "", "Pipeline description")

@@ -16,9 +16,11 @@ func NewDeleteCmd() *cobra.Command {
 		Short: "Delete a pipeline",
 		Long: `Delete a pipeline from your account. This action cannot be undone.
 
+The pipeline-id is a 26-character ULID (e.g., 01KM2XGX2RPYRQ9F7V2ZP3F5TQ).
+
 Examples:
-  inodes delete 01ABC...
-  inodes delete 01ABC... --force`,
+  inodes delete 01KM2XGX2RPYRQ9F7V2ZP3F5TQ
+  inodes delete 01KM2XGX2RPYRQ9F7V2ZP3F5TQ --force`,
 		Args:              cobra.ExactArgs(1),
 		RunE:              runDelete,
 		ValidArgsFunction: completePipelineIDs,

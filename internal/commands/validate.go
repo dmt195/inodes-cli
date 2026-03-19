@@ -16,8 +16,14 @@ func NewValidateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate <pipeline.json>",
 		Short: "Validate a pipeline definition without executing it",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runValidate,
+		Long: `Validate a pipeline JSON definition without executing it.
+
+Checks include: cycle detection, required connections, valid node types,
+parameter formats, and node ID format. Node IDs must be 12-character
+alphanumeric strings (no underscores). Nested pipeline references must
+be valid 26-character ULIDs pointing to existing pipelines.`,
+		Args: cobra.ExactArgs(1),
+		RunE: runValidate,
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")
 	return cmd

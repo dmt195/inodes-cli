@@ -9,8 +9,12 @@ import (
 
 func NewDescribeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "describe <pipeline-id>",
-		Short:             "Show pipeline parameters",
+		Use:   "describe <pipeline-id>",
+		Short: "Show pipeline parameters",
+		Long: `Show the API parameters (images and values) for a pipeline.
+
+The pipeline-id is a 26-character ULID (e.g., 01KM2XGX2RPYRQ9F7V2ZP3F5TQ).
+Use 'inodes list' to find pipeline IDs.`,
 		Args:              cobra.ExactArgs(1),
 		RunE:              runDescribe,
 		ValidArgsFunction: completePipelineIDs,

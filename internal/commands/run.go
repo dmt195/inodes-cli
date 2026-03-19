@@ -24,8 +24,14 @@ func NewRunCmd() *cobra.Command {
 		Short: "Execute a pipeline",
 		Long: `Execute a pipeline with parameters.
 
+The pipeline-id is a 26-character ULID (e.g., 01KM2XGX2RPYRQ9F7V2ZP3F5TQ).
+Use 'inodes list' to find pipeline IDs.
+
 Interactive mode (default): prompts for missing parameters.
-CI/CD mode (--no-prompt): uses flags and defaults only.`,
+CI/CD mode (--no-prompt): uses flags and defaults only.
+
+Image parameters accept either a local file path or a 26-character asset
+ID (ULID) from a previous 'inodes upload'.`,
 		Args:              cobra.ExactArgs(1),
 		RunE:              runPipeline,
 		ValidArgsFunction: completePipelineIDs,
