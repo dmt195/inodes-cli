@@ -27,20 +27,76 @@ func writeJSONResponse(w http.ResponseWriter, status int, data any) {
 
 func TestTestAuth_Success(t *testing.T) {
 	ts := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/auth/test" {
+		if r.URL.Path != "/api/v1/me" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Header.Get("X-API-Key") != "test-key" {
 			t.Errorf("missing API key header")
 		}
-		writeJSONResponse(w, http.StatusOK, nil)
+		writeJSONResponse(w, http.StatusOK, map[string]any{
+			"user": map[string]any{
+				"id":         42,
+				"email":      "alice@example.com",
+				"first_name": "Alice",
+				"last_name":  "Example",
+			},
+			"team": nil,
+		})
 	})
 	defer ts.Close()
 
 	c := New(ts.URL, "test-key")
-	err := c.TestAuth()
+	me, err := c.TestAuth()
 	if err != nil {
 		t.Fatalf("TestAuth failed: %v", err)
+	}
+	if me == nil {
+		t.Fatal("expected MeResponse, got nil")
+	}
+	if me.User.Email != "alice@example.com" {
+		t.Errorf("unexpected user email: %q", me.User.Email)
+	}
+	if me.User.FirstName != "Alice" || me.User.LastName != "Example" {
+		t.Errorf("unexpected user name: %q %q", me.User.FirstName, me.User.LastName)
+	}
+	if me.Team != nil {
+		t.Errorf("expected nil team for personal key, got %+v", me.Team)
+	}
+	if got := me.DisplayName(); got != "Alice Example" {
+		t.Errorf("DisplayName: expected 'Alice Example', got %q", got)
+	}
+}
+
+func TestTestAuth_WithTeam(t *testing.T) {
+	ts := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/me" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		writeJSONResponse(w, http.StatusOK, map[string]any{
+			"user": map[string]any{
+				"id":         42,
+				"email":      "alice@example.com",
+				"first_name": "Alice",
+				"last_name":  "Example",
+			},
+			"team": map[string]any{
+				"id":   10,
+				"name": "Acme Team",
+			},
+		})
+	})
+	defer ts.Close()
+
+	c := New(ts.URL, "team-key")
+	me, err := c.TestAuth()
+	if err != nil {
+		t.Fatalf("TestAuth failed: %v", err)
+	}
+	if me.Team == nil {
+		t.Fatal("expected team, got nil")
+	}
+	if me.Team.Name != "Acme Team" {
+		t.Errorf("unexpected team name: %q", me.Team.Name)
 	}
 }
 
@@ -52,7 +108,7 @@ func TestTestAuth_Unauthorized(t *testing.T) {
 	defer ts.Close()
 
 	c := New(ts.URL, "bad-key")
-	err := c.TestAuth()
+	_, err := c.TestAuth()
 	if err == nil {
 		t.Fatal("expected error for 401")
 	}

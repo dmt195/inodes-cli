@@ -56,7 +56,8 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 	// Test connectivity
 	fmt.Fprintf(os.Stderr, "Testing connection to %s... ", cfg.BaseURL)
 	c := client.New(cfg.BaseURL, cfg.APIKey)
-	if err := c.TestAuth(); err != nil {
+	me, err := c.TestAuth()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, tui.SymbolCross)
 		return fmt.Errorf("authentication failed: %w", err)
 	}
@@ -67,6 +68,15 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
+	// Show who we're logged in as, including team scope where applicable.
+	if me != nil && me.User.ID > 0 {
+		identity := me.DisplayName()
+		if me.Team != nil && me.Team.Name != "" {
+			fmt.Fprintf(os.Stderr, "%s Logged in as %s @ %s\n", tui.SymbolCheck, identity, me.Team.Name)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s Logged in as %s\n", tui.SymbolCheck, identity)
+		}
+	}
 	fmt.Fprintf(os.Stderr, "%s Configuration saved\n", tui.SymbolCheck)
 	return nil
 }
