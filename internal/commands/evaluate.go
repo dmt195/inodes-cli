@@ -16,8 +16,14 @@ func NewEvaluateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evaluate <pipeline.json>",
 		Short: "Execute a pipeline defined as a JSON file",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runEvaluate,
+		Long: `Execute a pipeline defined inline as JSON via the LLM evaluate endpoint.
+
+This endpoint returns a single base64-encoded image. For pipelines with
+multiple outputs, the alphabetically-first output is returned. To get all
+outputs from a multi-output pipeline, save it ('inodes save') and run via
+'inodes run', which uses the multi-output API.`,
+		Args: cobra.ExactArgs(1),
+		RunE: runEvaluate,
 	}
 	cmd.Flags().StringP("output", "o", "output.png", "Output file path")
 	cmd.Flags().Bool("json", false, "Output full report as JSON")

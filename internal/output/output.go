@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -97,6 +96,21 @@ func PrintPipelineDescription(desc *client.PipelineDescription) {
 				req = "required"
 			}
 			fmt.Fprintf(w, "%s\t%s\n", n.Key, req)
+		}
+		w.Flush()
+		fmt.Println()
+	}
+
+	if len(desc.Outputs) > 0 {
+		fmt.Println(tui.Subtitle.Render("── Outputs ──"))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, tui.Bold.Render("KEY")+"\t"+tui.Bold.Render("FORMAT")+"\t"+tui.Bold.Render("QUALITY"))
+		for _, o := range desc.Outputs {
+			quality := "-"
+			if o.Quality > 0 {
+				quality = fmt.Sprintf("%d", o.Quality)
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\n", o.Key, o.Format, quality)
 		}
 		w.Flush()
 		fmt.Println()
@@ -218,22 +232,29 @@ func PrintPipelineExport(p *client.PipelineFull) {
 	fmt.Println(tui.Muted.Render("  inodes export " + p.ID + " -o pipeline.json"))
 }
 
-// PrintRunResult prints the result summary of a pipeline execution
-func PrintRunResult(report *client.PipelineReport, outputPath string) {
+// PrintRunResult prints a per-output summary of a pipeline execution.
+// Each entry of writes is { name, path }, in the order they were written.
+func PrintRunResult(report *client.PipelineReport, writes []WrittenOutput) {
 	duration := report.TotalProcessingTime / time.Millisecond
-	dims := fmt.Sprintf("%dx%d", report.ImageDetails.Width, report.ImageDetails.Height)
-	format := report.ImageDetails.Format
-	if format == "" {
-		format = "png"
+	for _, wr := range writes {
+		out, ok := report.Outputs[wr.Name]
+		if !ok {
+			continue
+		}
+		dims := fmt.Sprintf("%dx%d", out.Width, out.Height)
+		format := out.Format
+		if format == "" {
+			format = "png"
+		}
+		fmt.Fprintf(os.Stderr, "%s %s → %s (%s %s)\n",
+			tui.SymbolCheck, tui.Bold.Render(wr.Name), tui.Bold.Render(wr.Path), dims, format)
 	}
+	fmt.Fprintf(os.Stderr, "%s %dms, %d credits\n",
+		tui.SymbolArrow, duration, report.TotalUnitsBillable)
+}
 
-	parts := []string{
-		fmt.Sprintf("Saved to %s", tui.Bold.Render(outputPath)),
-		fmt.Sprintf("(%s %s", dims, format),
-	}
-
-	parts = append(parts, fmt.Sprintf("%dms", duration))
-	parts = append(parts, fmt.Sprintf("%d credits)", report.TotalUnitsBillable))
-
-	fmt.Fprintf(os.Stderr, "%s %s\n", tui.SymbolCheck, strings.Join(parts, ", "))
+// WrittenOutput records that a named output was saved to a path.
+type WrittenOutput struct {
+	Name string
+	Path string
 }

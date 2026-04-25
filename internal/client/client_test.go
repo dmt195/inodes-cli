@@ -171,6 +171,10 @@ func TestDescribePipeline(t *testing.T) {
 			"api_image_nodes": []map[string]any{
 				{"key": "logo", "required": false},
 			},
+			"outputs": []map[string]any{
+				{"key": "thumbnail", "format": "jpeg", "quality": 85},
+				{"key": "banner", "format": "png"},
+			},
 		})
 	})
 	defer ts.Close()
@@ -192,6 +196,12 @@ func TestDescribePipeline(t *testing.T) {
 	if len(desc.ApiImageNodes) != 1 {
 		t.Fatalf("expected 1 image node, got %d", len(desc.ApiImageNodes))
 	}
+	if len(desc.Outputs) != 2 {
+		t.Fatalf("expected 2 outputs, got %d", len(desc.Outputs))
+	}
+	if desc.Outputs[0].Key != "thumbnail" || desc.Outputs[0].Format != "jpeg" || desc.Outputs[0].Quality != 85 {
+		t.Errorf("unexpected first output: %+v", desc.Outputs[0])
+	}
 }
 
 func TestEvaluatePipeline(t *testing.T) {
@@ -210,11 +220,13 @@ func TestEvaluatePipeline(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"success": true,
-			"image_details": map[string]any{
-				"image_url": "/api/v1/assets/ephemeral/result-123/file",
-				"width":     800,
-				"height":    600,
-				"format":    "png",
+			"outputs": map[string]any{
+				"output": map[string]any{
+					"image_url": "/api/v1/assets/ephemeral/result-123/file",
+					"width":     800,
+					"height":    600,
+					"format":    "png",
+				},
 			},
 			"total_processing_time":  350000000,
 			"total_processing_units": 3,
@@ -230,10 +242,14 @@ func TestEvaluatePipeline(t *testing.T) {
 	if !report.Success {
 		t.Error("expected success=true")
 	}
-	if report.ImageDetails.Width != 800 {
-		t.Errorf("expected width 800, got %d", report.ImageDetails.Width)
+	out, ok := report.Outputs["output"]
+	if !ok {
+		t.Fatal("expected output named 'output' in outputs map")
 	}
-	if report.ImageDetails.ImageUrl == "" {
+	if out.Width != 800 {
+		t.Errorf("expected width 800, got %d", out.Width)
+	}
+	if out.ImageUrl == "" {
 		t.Error("expected non-empty image URL")
 	}
 }

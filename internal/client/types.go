@@ -60,6 +60,7 @@ type PipelineDescription struct {
 	DescribeLink  string               `json:"describe_link,omitempty"`
 	ApiNodes      []ApiValueDescriptor `json:"api_nodes"`
 	ApiImageNodes []ApiImageDescriptor `json:"api_image_nodes,omitempty"`
+	Outputs       []OutputDescriptor   `json:"outputs"`
 }
 
 // ApiValueDescriptor describes a value parameter
@@ -75,17 +76,25 @@ type ApiImageDescriptor struct {
 	Required bool   `json:"required"`
 }
 
-// PipelineReport is the result of evaluating a pipeline
-type PipelineReport struct {
-	Success             bool            `json:"success"`
-	ImageDetails        ImageDetails    `json:"image_details"`
-	TotalProcessingTime time.Duration   `json:"total_processing_time"`
-	TotalUnitsBillable  int             `json:"total_processing_units"`
-	NodesPerformance    []NodePerfEntry `json:"nodes_performance,omitempty"`
+// OutputDescriptor describes one named output a pipeline produces.
+type OutputDescriptor struct {
+	Key     string `json:"key"`
+	Format  string `json:"format"`
+	Quality int    `json:"quality,omitempty"`
 }
 
-// ImageDetails holds the result image info
-type ImageDetails struct {
+// PipelineReport is the result of evaluating a pipeline.
+// Outputs is keyed by the user-defined params_name on each output node.
+type PipelineReport struct {
+	Success             bool                     `json:"success"`
+	Outputs             map[string]OutputDetails `json:"outputs"`
+	TotalProcessingTime time.Duration            `json:"total_processing_time"`
+	TotalUnitsBillable  int                      `json:"total_processing_units"`
+	NodesPerformance    []NodePerfEntry          `json:"nodes_performance,omitempty"`
+}
+
+// OutputDetails holds the result image info for one named output.
+type OutputDetails struct {
 	ImageAsBase64 string `json:"image_as_base_64,omitempty"`
 	ImageUrl      string `json:"image_url,omitempty"`
 	Width         int    `json:"width"`

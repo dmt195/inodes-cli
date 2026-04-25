@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/dmt195/inodes-cli/internal/client"
@@ -71,7 +72,7 @@ func main() {
 	), handleListPipelines)
 
 	mcpServer.AddTool(mcp.NewTool("describe_pipeline",
-		mcp.WithDescription("Get the parameter schema for a pipeline. Returns value parameters (with types and defaults) and image parameters (with required flags). Use this before run_pipeline to understand what inputs are needed."),
+		mcp.WithDescription("Get the parameter schema for a pipeline. Returns value parameters (with types and defaults), image parameters (with required flags), and the list of outputs the pipeline produces (each with a key, format, and quality). Use this before run_pipeline so you know what inputs to send and what keys will appear in the response's outputs map."),
 		mcp.WithString("pipeline_id",
 			mcp.Description("The pipeline ID"),
 			mcp.Required(),
@@ -95,7 +96,7 @@ func main() {
 	), handleDeletePipeline)
 
 	mcpServer.AddTool(mcp.NewTool("run_pipeline",
-		mcp.WithDescription("Execute an image processing pipeline with the given parameters. Returns the result image (as a URL or base64) along with processing time and billing info. Use describe_pipeline first to learn the required parameters."),
+		mcp.WithDescription("Execute an image processing pipeline with the given parameters. Returns an outputs map keyed by user-defined output name (e.g. {\"thumbnail\": {...}, \"banner\": {...}}); single-output pipelines return a one-entry map. Each entry includes image_url, width, height, format, and (when base64=true) image_as_base_64. Use describe_pipeline first to learn the parameters and which output keys to expect."),
 		mcp.WithString("pipeline_id",
 			mcp.Description("The pipeline ID"),
 			mcp.Required(),
@@ -104,7 +105,7 @@ func main() {
 			mcp.Description("Key-value parameters for the pipeline (from describe_pipeline). Image params should be asset IDs (from upload_image)."),
 		),
 		mcp.WithBoolean("base64",
-			mcp.Description("If true, return the image as base64 instead of a URL (default false)"),
+			mcp.Description("If true, populate image_as_base_64 on every output (default false)"),
 		),
 	), handleRunPipeline)
 
@@ -118,7 +119,7 @@ func main() {
 
 	// LLM Integration endpoints (paid plans) — dynamic pipeline creation
 	mcpServer.AddTool(mcp.NewTool("get_node_schema",
-		mcp.WithDescription("Discover all available image processing node types and their parameters. Use this to understand what nodes can be used when building a custom pipeline definition. Returns node types, their inputs, outputs, and configurable properties."),
+		mcp.WithDescription("Discover all available image processing node types and their parameters. Use this to understand what nodes can be used when building a custom pipeline definition. Returns node types, their inputs, outputs, and configurable properties. Notes: OutputNode includes a params_name parameter that becomes the key in run_pipeline's outputs map (default 'output'); a pipeline may have multiple OutputNodes, each producing a separately-keyed output. NestedPipelineNode entries include dynamic_outputs:true — its concrete output names come from the referenced sub-pipeline (call describe_pipeline on that pipeline to see them)."),
 	), handleGetNodeSchema)
 
 	mcpServer.AddTool(mcp.NewTool("validate_pipeline",
@@ -153,7 +154,7 @@ func main() {
 	), handleSavePipeline)
 
 	mcpServer.AddTool(mcp.NewTool("evaluate_pipeline",
-		mcp.WithDescription("Execute a custom pipeline defined as JSON. Unlike run_pipeline (which runs a stored pipeline by ID), this executes an ad-hoc pipeline definition directly. Requires a paid subscription. Use get_node_schema to discover available nodes, and validate_pipeline to check your definition first."),
+		mcp.WithDescription("Execute a custom pipeline defined as JSON. Unlike run_pipeline (which runs a stored pipeline by ID and returns a full outputs map), this LLM-mode endpoint returns a single base64-encoded image — the alphabetically-first output for multi-output pipelines. To get every output of a multi-output pipeline, use save_pipeline followed by run_pipeline. Requires a paid subscription. Use get_node_schema to discover nodes and validate_pipeline to check the definition first."),
 		mcp.WithObject("pipeline",
 			mcp.Description("The pipeline definition as a JSON object"),
 			mcp.Required(),
@@ -333,34 +334,49 @@ func handleRunPipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return errorResult(err), nil
 	}
 
-	// If we got base64 image data, return it as an image content block
-	if base64Flag && report.ImageDetails.ImageAsBase64 != "" {
-		mimeType := "image/png"
-		if report.ImageDetails.Format != "" {
-			mimeType = "image/" + report.ImageDetails.Format
+	// When base64 is requested, surface every output as an inline image block
+	// alongside the JSON payload so the model can both display and reason about
+	// them. Outputs without base64 data are still returned in the JSON.
+	if base64Flag && len(report.Outputs) > 0 {
+		names := sortedOutputNames(report)
+		var content []mcp.Content
+		for _, name := range names {
+			out := report.Outputs[name]
+			if out.ImageAsBase64 == "" {
+				continue
+			}
+			mimeType := "image/png"
+			if out.Format != "" {
+				mimeType = "image/" + out.Format
+			}
+			content = append(content,
+				mcp.TextContent{Type: "text", Text: fmt.Sprintf("Output %q (%dx%d %s):", name, out.Width, out.Height, out.Format)},
+				mcp.ImageContent{Type: "image", Data: out.ImageAsBase64, MIMEType: mimeType},
+			)
 		}
-
-		summary := fmt.Sprintf("Pipeline executed successfully. %dx%d %s, %d units billed, %.2fs processing time.",
-			report.ImageDetails.Width, report.ImageDetails.Height,
-			report.ImageDetails.Format, report.TotalUnitsBillable,
-			report.TotalProcessingTime.Seconds())
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.ImageContent{
-					Type:     "image",
-					Data:     report.ImageDetails.ImageAsBase64,
-					MIMEType: mimeType,
-				},
-				mcp.TextContent{
-					Type: "text",
-					Text: summary,
-				},
-			},
-		}, nil
+		if len(content) > 0 {
+			data, err := json.MarshalIndent(report, "", "  ")
+			if err == nil {
+				content = append(content, mcp.TextContent{Type: "text", Text: string(data)})
+			}
+			summary := fmt.Sprintf("Pipeline executed successfully: %d output(s), %d units billed, %.2fs processing time.",
+				len(report.Outputs), report.TotalUnitsBillable, report.TotalProcessingTime.Seconds())
+			content = append(content, mcp.TextContent{Type: "text", Text: summary})
+			return &mcp.CallToolResult{Content: content}, nil
+		}
 	}
 
 	return jsonResult(report)
+}
+
+// sortedOutputNames returns the keys of report.Outputs in alphabetical order.
+func sortedOutputNames(report *client.PipelineReport) []string {
+	names := make([]string, 0, len(report.Outputs))
+	for name := range report.Outputs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func handleUploadImage(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
