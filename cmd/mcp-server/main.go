@@ -24,8 +24,9 @@ Use these tools to run pre-built pipelines saved in a user's account:
 2. describe_pipeline → get the parameter schema (inputs, types, defaults)
 3. export_pipeline → get the full graph definition (nodes, values, connections)
 4. upload_image → upload a local image file to get an asset ID
-5. run_pipeline → execute with parameters, get result image
-6. delete_pipeline → remove a pipeline from the account
+5. delete_image → delete an ephemeral asset before its 24h TTL expires
+6. run_pipeline → execute with parameters, get result image
+7. delete_pipeline → remove a pipeline from the account
 
 ## Dynamic Pipelines (paid plans)
 Build and execute custom pipelines on the fly from JSON:
@@ -110,12 +111,20 @@ func main() {
 	), handleRunPipeline)
 
 	mcpServer.AddTool(mcp.NewTool("upload_image",
-		mcp.WithDescription("Upload a local image file as an ephemeral asset (expires in 24h). Returns an asset ID that can be used as an image parameter in run_pipeline."),
+		mcp.WithDescription("Upload a local image file as an ephemeral asset (expires in 24h). Returns an asset ID that can be used as an image parameter in run_pipeline. Each user is capped at 20 active (non-expired) ephemeral assets by default — use delete_image to free a slot before the TTL elapses if you're hitting the limit."),
 		mcp.WithString("file_path",
 			mcp.Description("Absolute path to the image file to upload"),
 			mcp.Required(),
 		),
 	), handleUploadImage)
+
+	mcpServer.AddTool(mcp.NewTool("delete_image",
+		mcp.WithDescription("Delete an ephemeral asset previously uploaded via upload_image, before its 24h TTL expires. Frees a slot against the per-user ephemeral-asset cap. Returns the deleted asset ID on success; returns an error if the asset is unknown, already deleted, or already expired."),
+		mcp.WithString("asset_id",
+			mcp.Description("The ephemeral asset ID returned by upload_image"),
+			mcp.Required(),
+		),
+	), handleDeleteImage)
 
 	// LLM Integration endpoints (paid plans) — dynamic pipeline creation
 	mcpServer.AddTool(mcp.NewTool("get_node_schema",
@@ -184,6 +193,7 @@ Tools provided:
     export_pipeline        Export full graph definition of a pipeline
     run_pipeline           Execute a stored pipeline with parameters
     upload_image           Upload a local image as an ephemeral asset
+    delete_image           Delete an ephemeral asset before its 24h TTL
     delete_pipeline        Delete a pipeline from your account
 
   Dynamic Pipelines (paid plans):
@@ -396,6 +406,27 @@ func handleUploadImage(_ context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	return jsonResult(result)
+}
+
+func handleDeleteImage(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := newClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	assetID, err := request.RequireString("asset_id")
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	if err := c.DeleteEphemeral(assetID); err != nil {
+		return errorResult(err), nil
+	}
+
+	return jsonResult(map[string]string{
+		"deleted": assetID,
+		"status":  "ok",
+	})
 }
 
 func handleGetNodeSchema(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {

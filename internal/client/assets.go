@@ -59,3 +59,14 @@ func (c *Client) UploadEphemeral(filePath string) (*EphemeralUploadResponse, err
 	}
 	return &result, nil
 }
+
+// DeleteEphemeral deletes an ephemeral asset by ID, freeing a slot against the per-user limit.
+func (c *Client) DeleteEphemeral(id string) error {
+	path := fmt.Sprintf("/api/v1/assets/ephemeral/%s", id)
+	resp, err := c.delete(path)
+	if err != nil {
+		return err
+	}
+	_, err = decodeJSON(resp)
+	return err
+}
