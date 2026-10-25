@@ -112,6 +112,18 @@ func runPipeline(cmd *cobra.Command, args []string) error {
 		imageParams[k] = v
 	}
 
+	paramKeys := make([]string, 0, len(params))
+	for k := range params {
+		paramKeys = append(paramKeys, k)
+	}
+	imageKeys := make([]string, 0, len(imageParams))
+	for k := range imageParams {
+		imageKeys = append(imageKeys, k)
+	}
+	if err := checkParamKinds(desc, paramKeys, imageKeys); err != nil {
+		return err
+	}
+
 	// Upload image files that are local paths
 	for key, val := range imageParams {
 		if idRegex.MatchString(val) {
@@ -160,6 +172,9 @@ func runPipeline(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	fmt.Fprintln(os.Stderr, tui.SymbolCheck)
+	for _, w := range report.Warnings {
+		fmt.Fprintf(os.Stderr, "Warning [%s] %s: %s\n", w.Code, w.NodeName, w.Message)
+	}
 
 	// 7. Output results
 	if asJSON {
@@ -406,4 +421,25 @@ func promptForMissingParams(desc *client.PipelineDescription, params map[string]
 
 	form := huh.NewForm(huh.NewGroup(fields...))
 	return form.Run()
+}
+
+// checkParamKinds catches an image parameter passed with --param, or a value
+// parameter passed with --image, before the API rejects it with a less
+// helpful message.
+func checkParamKinds(desc *client.PipelineDescription, paramKeys, imageKeys []string) error {
+	for _, k := range paramKeys {
+		for _, img := range desc.ApiImageNodes {
+			if img.Key == k {
+				return fmt.Errorf("%q is an image parameter: use --image %s=<file|asset-id> instead of --param", k, k)
+			}
+		}
+	}
+	for _, k := range imageKeys {
+		for _, val := range desc.ApiNodes {
+			if val.Key == k {
+				return fmt.Errorf("%q is a value parameter: use --param %s=<value> instead of --image", k, k)
+			}
+		}
+	}
+	return nil
 }

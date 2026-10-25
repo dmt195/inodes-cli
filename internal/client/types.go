@@ -44,6 +44,8 @@ type PipelineFull struct {
 	PipelineData map[string]any `json:"pipeline_data,omitempty"`
 	IsFavourite  bool           `json:"is_favourite"`
 	IsLocked     bool           `json:"is_locked"`
+	// Version is the pipeline's current version, for optimistic locking.
+	Version int `json:"version,omitempty"`
 }
 
 // PipelineFullResponse wraps PipelineFull for endpoints that return extra fields
@@ -91,6 +93,7 @@ type PipelineReport struct {
 	TotalProcessingTime time.Duration            `json:"total_processing_time"`
 	TotalUnitsBillable  int                      `json:"total_processing_units"`
 	NodesPerformance    []NodePerfEntry          `json:"nodes_performance,omitempty"`
+	Warnings            []RunWarning             `json:"warnings,omitempty"`
 }
 
 // OutputDetails holds the result image info for one named output.
@@ -131,25 +134,36 @@ type EphemeralUploadResponse struct {
 
 // NodeSchema describes an available node type and its parameters
 type NodeSchema struct {
-	Type        string         `json:"type"`
-	Description string         `json:"description,omitempty"`
-	Category    string         `json:"category,omitempty"`
-	Inputs      []NodeInput    `json:"inputs,omitempty"`
-	Outputs     []NodeOutput   `json:"outputs,omitempty"`
-	Properties  map[string]any `json:"properties,omitempty"`
+	Type        string          `json:"type"`
+	DisplayName string          `json:"display_name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Category    string          `json:"category,omitempty"`
+	Inputs      []NodeConnector `json:"inputs,omitempty"`
+	Outputs     []NodeConnector `json:"outputs,omitempty"`
+	Parameters  []NodeParameter `json:"parameters,omitempty"`
+	Examples    []string        `json:"examples,omitempty"`
 }
 
-// NodeInput describes a node input slot
-type NodeInput struct {
-	Name     string `json:"name"`
-	DataType string `json:"data_type"`
-	Required bool   `json:"required"`
+// NodeConnector describes a node input or output connector
+type NodeConnector struct {
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Required     bool   `json:"required"`
+	Description  string `json:"description,omitempty"`
+	IsPixelSpace bool   `json:"is_pixel_space,omitempty"`
 }
 
-// NodeOutput describes a node output slot
-type NodeOutput struct {
-	Name     string `json:"name"`
-	DataType string `json:"data_type"`
+// NodeParameter describes a configurable node parameter. Enum lists the
+// accepted values for parameters such as fonts and blend modes.
+type NodeParameter struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	Default      any      `json:"default,omitempty"`
+	Min          *float64 `json:"min,omitempty"`
+	Max          *float64 `json:"max,omitempty"`
+	Description  string   `json:"description"`
+	IsPixelSpace bool     `json:"is_pixel_space,omitempty"`
+	Enum         []string `json:"enum,omitempty"`
 }
 
 // SchemaNodesResponse is the response from the schema/nodes endpoint
@@ -171,11 +185,34 @@ type ValidationError struct {
 
 // EvaluateJSONResponse is the response from the pipeline/evaluate endpoint
 type EvaluateJSONResponse struct {
-	Success  bool           `json:"success"`
-	Output   string         `json:"output,omitempty"`
-	Cost     int            `json:"cost"`
-	Error    string         `json:"error,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Success bool   `json:"success"`
+	Output  string `json:"output,omitempty"`
+	// Outputs holds every output image as base64, keyed by output name.
+	Outputs   map[string]string `json:"outputs,omitempty"`
+	Cost      int               `json:"cost"`
+	Error     string            `json:"error,omitempty"`
+	NodeError *NodeError        `json:"node_error,omitempty"`
+	Warnings  []RunWarning      `json:"warnings,omitempty"`
+	Metadata  map[string]any    `json:"metadata,omitempty"`
+}
+
+// NodeError identifies the node that made a run fail.
+type NodeError struct {
+	Code     string `json:"code"`
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name"`
+	NodeType string `json:"node_type"`
+	Reason   string `json:"reason"`
+}
+
+// RunWarning is a problem that didn't stop a run but probably made its
+// output wrong, such as text in a font that lacks its characters.
+type RunWarning struct {
+	Code     string `json:"code"`
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name"`
+	NodeType string `json:"node_type"`
+	Message  string `json:"message"`
 }
 
 // EstimateCostResponse is the response from the pipeline/estimate-cost endpoint

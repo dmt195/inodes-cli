@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -16,37 +17,51 @@ const (
 type Config struct {
 	APIKey  string `json:"api_key"`
 	BaseURL string `json:"base_url"`
+
+	// APIKeySource and BaseURLSource say where each value came from, such as
+	// "--api-key flag" or "config file /path/config.json". Not saved.
+	APIKeySource  string `json:"-"`
+	BaseURLSource string `json:"-"`
 }
 
 // Load reads config with priority: flags > env vars > config file
 func Load(flagAPIKey, flagBaseURL string) (*Config, error) {
-	cfg := &Config{}
+	cfg := &Config{APIKeySource: "not set"}
 
 	// Start with config file
 	fileCfg, _ := loadFromFile()
 	if fileCfg != nil {
-		*cfg = *fileCfg
+		fileSource := "config file"
+		if path, err := FilePath(); err == nil {
+			fileSource += " " + path
+		}
+		if fileCfg.APIKey != "" {
+			cfg.APIKey, cfg.APIKeySource = fileCfg.APIKey, fileSource
+		}
+		if fileCfg.BaseURL != "" {
+			cfg.BaseURL, cfg.BaseURLSource = fileCfg.BaseURL, fileSource
+		}
 	}
 
 	// Override with env vars
 	if v := os.Getenv("INODES_API_KEY"); v != "" {
-		cfg.APIKey = v
+		cfg.APIKey, cfg.APIKeySource = v, "INODES_API_KEY environment variable"
 	}
 	if v := os.Getenv("INODES_BASE_URL"); v != "" {
-		cfg.BaseURL = v
+		cfg.BaseURL, cfg.BaseURLSource = v, "INODES_BASE_URL environment variable"
 	}
 
 	// Override with flags
 	if flagAPIKey != "" {
-		cfg.APIKey = flagAPIKey
+		cfg.APIKey, cfg.APIKeySource = flagAPIKey, "--api-key flag"
 	}
 	if flagBaseURL != "" {
-		cfg.BaseURL = flagBaseURL
+		cfg.BaseURL, cfg.BaseURLSource = flagBaseURL, "--base-url flag"
 	}
 
 	// Default base URL
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = "https://imagenodes.com"
+		cfg.BaseURL, cfg.BaseURLSource = "https://imagenodes.com", "default"
 	}
 
 	return cfg, nil
@@ -103,4 +118,24 @@ func configPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, configDir), nil
+}
+
+// FilePath returns the path of the config file, whether or not it exists.
+func FilePath() (string, error) {
+	dir, err := configPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, configFile), nil
+}
+
+// MaskKey hides all but the first and last four characters of an API key.
+func MaskKey(key string) string {
+	if key == "" {
+		return "(not set)"
+	}
+	if len(key) <= 8 {
+		return strings.Repeat("*", len(key))
+	}
+	return key[:4] + strings.Repeat("*", len(key)-8) + key[len(key)-4:]
 }
