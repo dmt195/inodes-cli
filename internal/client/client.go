@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -15,6 +16,8 @@ type Client struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
+	// Retries is how many times to retry a transient failure (see retry.go).
+	Retries int
 }
 
 // New creates a new API client
@@ -25,6 +28,7 @@ func New(baseURL, apiKey string) *Client {
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		Retries: DefaultRetries,
 	}
 }
 
@@ -42,10 +46,48 @@ func (c *Client) ResolveURL(path string) string {
 	return c.baseURL + path
 }
 
+// do sends req with the API key, retrying transient failures. A request
+// with a body is only retried if the body can be replayed (GetBody is set,
+// as it is for requests built from a byte slice).
 func (c *Client) do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("Accept", "application/json")
-	return c.httpClient.Do(req)
+
+	for attempt := 0; ; attempt++ {
+		resp, err := c.httpClient.Do(req)
+		canRetry := attempt < c.Retries && (req.Body == nil || req.GetBody != nil)
+		if !canRetry {
+			return resp, err
+		}
+
+		var retryAfter string
+		switch {
+		case err != nil && shouldRetryError(req.Method, err):
+		case err == nil && shouldRetryStatus(req.Method, resp.StatusCode):
+			retryAfter = resp.Header.Get("Retry-After")
+			io.Copy(io.Discard, resp.Body) //nolint:errcheck
+			resp.Body.Close()
+		default:
+			return resp, err
+		}
+
+		delay := retryDelay(attempt, retryAfter)
+		reason := "network error"
+		if err == nil {
+			reason = resp.Status
+		}
+		fmt.Fprintf(os.Stderr, "%s %s: %s, retrying in %s (%d/%d)\n",
+			req.Method, req.URL.Path, reason, delay.Round(100*time.Millisecond), attempt+1, c.Retries)
+		time.Sleep(delay)
+
+		if req.GetBody != nil {
+			body, bodyErr := req.GetBody()
+			if bodyErr != nil {
+				return nil, bodyErr
+			}
+			req.Body = body
+		}
+	}
 }
 
 func (c *Client) get(path string) (*http.Response, error) {

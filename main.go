@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dmt195/inodes-cli/internal/client"
 	"github.com/dmt195/inodes-cli/internal/commands"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,18 @@ func main() {
 	// Global flags
 	root.PersistentFlags().String("api-key", "", "API key (overrides config and INODES_API_KEY)")
 	root.PersistentFlags().String("base-url", "", "API base URL (overrides config and INODES_BASE_URL)")
+	root.PersistentFlags().Int("retries", client.DefaultRetries, "Times to retry rate limits, busy responses and network errors (0 to disable)")
+	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		retries, err := cmd.Flags().GetInt("retries")
+		if err != nil {
+			return err
+		}
+		if retries < 0 {
+			return fmt.Errorf("--retries must be 0 or more")
+		}
+		client.DefaultRetries = retries
+		return nil
+	}
 
 	// Commands
 	root.AddCommand(commands.NewConfigureCmd())
