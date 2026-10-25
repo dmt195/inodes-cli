@@ -57,7 +57,7 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 		resp, err := c.httpClient.Do(req)
 		canRetry := attempt < c.Retries && (req.Body == nil || req.GetBody != nil)
 		if !canRetry {
-			return resp, err
+			return resp, c.explainNetworkError(err)
 		}
 
 		var retryAfter string
@@ -68,7 +68,7 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 			io.Copy(io.Discard, resp.Body) //nolint:errcheck
 			resp.Body.Close()
 		default:
-			return resp, err
+			return resp, c.explainNetworkError(err)
 		}
 
 		delay := retryDelay(attempt, retryAfter)
@@ -175,4 +175,13 @@ func decodeJSON(resp *http.Response) (json.RawMessage, error) {
 
 	// No data field — return full body
 	return body, nil
+}
+
+// explainNetworkError adds the base URL to a transport error, since a wrong
+// base URL (from a flag, env var or config file) is a common cause.
+func (c *Client) explainNetworkError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%w (base URL %s; run 'inodes config show' to see where it comes from)", err, c.baseURL)
 }

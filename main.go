@@ -39,6 +39,7 @@ func main() {
 
 	// Commands
 	root.AddCommand(commands.NewConfigureCmd())
+	root.AddCommand(commands.NewConfigCmd())
 	root.AddCommand(commands.NewListCmd())
 	root.AddCommand(commands.NewDescribeCmd())
 	root.AddCommand(commands.NewRunCmd())

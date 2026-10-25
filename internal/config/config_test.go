@@ -112,3 +112,53 @@ func TestRequireAPIKey(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestLoad_RecordsWhereEachValueCameFrom(t *testing.T) {
+	isolateConfig(t)
+	t.Setenv("INODES_API_KEY", "")
+	t.Setenv("INODES_BASE_URL", "")
+	if err := Save(&Config{APIKey: "file-key", BaseURL: "http://file.example"}); err != nil {
+		t.Fatal(err)
+	}
+	path, err := FilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := Load("", "")
+	if cfg.APIKeySource != "config file "+path || cfg.BaseURLSource != "config file "+path {
+		t.Errorf("file sources: key %q, url %q", cfg.APIKeySource, cfg.BaseURLSource)
+	}
+
+	t.Setenv("INODES_BASE_URL", "http://env.example")
+	cfg, _ = Load("flag-key", "")
+	if cfg.APIKeySource != "--api-key flag" {
+		t.Errorf("key source %q", cfg.APIKeySource)
+	}
+	if cfg.BaseURLSource != "INODES_BASE_URL environment variable" {
+		t.Errorf("url source %q", cfg.BaseURLSource)
+	}
+}
+
+func TestLoad_DefaultBaseURLSource(t *testing.T) {
+	isolateConfig(t)
+	t.Setenv("INODES_API_KEY", "")
+	t.Setenv("INODES_BASE_URL", "")
+	cfg, _ := Load("", "")
+	if cfg.BaseURLSource != "default" || cfg.APIKeySource != "not set" {
+		t.Errorf("sources: key %q, url %q", cfg.APIKeySource, cfg.BaseURLSource)
+	}
+}
+
+func TestMaskKey(t *testing.T) {
+	cases := map[string]string{
+		"":                  "(not set)",
+		"short":             "*****",
+		"inodes_abcdef1234": "inod*********1234",
+	}
+	for in, want := range cases {
+		if got := MaskKey(in); got != want {
+			t.Errorf("MaskKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
