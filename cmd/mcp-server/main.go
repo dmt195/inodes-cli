@@ -35,6 +35,8 @@ Build and execute custom pipelines on the fly from JSON:
 3. estimate_pipeline_cost → estimate cost before executing
 4. evaluate_pipeline → execute the pipeline and get the result image
 5. save_pipeline → save a pipeline definition to the user's account
+   (pass pipeline_id to update an existing pipeline's graph in place
+   instead of creating a new one)
 
 ## Refactoring Pipelines
 To decompose a large pipeline into reusable nested sub-pipelines:
@@ -43,7 +45,9 @@ To decompose a large pipeline into reusable nested sub-pipelines:
 3. save_pipeline → save each sub-graph as its own pipeline
 4. Build a composed pipeline using NodeType.nestedpipeline nodes
 5. validate_pipeline + evaluate_pipeline → test the composed pipeline
-6. delete_pipeline → clean up old pipelines if needed
+6. save_pipeline with pipeline_id → overwrite the original pipeline with the
+   composed graph (keeps its ID, name and description), or delete_pipeline to
+   clean up old pipelines if needed
 
 ## Authentication
 Requires an API key set via the INODES_API_KEY environment variable
@@ -148,13 +152,18 @@ func main() {
 	), handleEstimatePipelineCost)
 
 	mcpServer.AddTool(mcp.NewTool("save_pipeline",
-		mcp.WithDescription("Save a custom pipeline definition to the user's account. Validates the pipeline before saving. Returns the pipeline ID and convenience URLs for evaluating and describing the saved pipeline. Requires a paid subscription."),
+		mcp.WithDescription("Save a custom pipeline definition to the user's account. Validates the pipeline before saving. Without pipeline_id a new pipeline is created (counts towards the plan's pipeline limit; name is required). With pipeline_id the existing pipeline's graph is replaced in place (name and description are left unchanged and ignored). Returns the pipeline ID and convenience URLs for evaluating and describing the saved pipeline (plus the new version on update). Requires a paid subscription."),
 		mcp.WithString("name",
-			mcp.Description("Name for the saved pipeline"),
-			mcp.Required(),
+			mcp.Description("Name for the new pipeline (required when creating; ignored when pipeline_id is set)"),
 		),
 		mcp.WithString("description",
-			mcp.Description("Optional description of what the pipeline does"),
+			mcp.Description("Optional description of what the pipeline does (ignored when pipeline_id is set)"),
+		),
+		mcp.WithString("pipeline_id",
+			mcp.Description("Optional ID of an existing pipeline to update instead of creating a new one"),
+		),
+		mcp.WithNumber("version",
+			mcp.Description("Optional, with pipeline_id: only update if the stored pipeline is at this version (optimistic lock; fails with a version conflict otherwise). Omit to overwrite unconditionally."),
 		),
 		mcp.WithObject("pipeline",
 			mcp.Description("The pipeline definition as a JSON object (nodes, values, connectionMapFwd, connectionMapRev)"),
@@ -201,7 +210,7 @@ Tools provided:
     validate_pipeline      Validate a pipeline JSON definition
     estimate_pipeline_cost Estimate execution cost
     evaluate_pipeline      Execute a custom pipeline from JSON
-    save_pipeline          Save a pipeline definition to your account
+    save_pipeline          Save (create or update) a pipeline definition
 
 Configuration:
   Set INODES_API_KEY as an environment variable, or run 'inodes configure'.
@@ -536,20 +545,31 @@ func handleSavePipeline(_ context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		return errorResult(err), nil
 	}
 
-	name, err := request.RequireString("name")
-	if err != nil {
-		return errorResult(err), nil
-	}
-
 	args := request.GetArguments()
-	description := ""
-	if d, ok := args["description"].(string); ok {
-		description = d
-	}
+	name, _ := args["name"].(string)
+	description, _ := args["description"].(string)
+	pipelineID, _ := args["pipeline_id"].(string)
 
 	pipeline, ok := args["pipeline"].(map[string]any)
 	if !ok {
 		return errorResult(fmt.Errorf("pipeline must be a JSON object")), nil
+	}
+	pipeline = unwrapPipeline(pipeline)
+
+	if pipelineID != "" {
+		version := intArg(args, "version", 0)
+		if version < 0 {
+			return errorResult(fmt.Errorf("version must be a positive integer")), nil
+		}
+		result, err := c.UpdatePipeline(pipelineID, pipeline, version)
+		if err != nil {
+			return errorResult(err), nil
+		}
+		return jsonResult(result)
+	}
+
+	if name == "" {
+		return errorResult(fmt.Errorf("name is required when creating a pipeline (or pass pipeline_id to update an existing one)")), nil
 	}
 
 	result, err := c.SavePipeline(name, description, pipeline)
@@ -569,6 +589,15 @@ func wrapPipeline(pipeline map[string]any) map[string]any {
 		return pipeline
 	}
 	return map[string]any{"pipeline": pipeline}
+}
+
+// unwrapPipeline strips a {"pipeline": {...}} envelope (as returned by
+// export_pipeline) so the save/update request body carries the bare graph.
+func unwrapPipeline(pipeline map[string]any) map[string]any {
+	if inner, ok := pipeline["pipeline"].(map[string]any); ok {
+		return inner
+	}
+	return pipeline
 }
 
 func errorResult(err error) *mcp.CallToolResult {

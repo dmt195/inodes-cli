@@ -27,6 +27,7 @@ into 'inodes save', 'inodes validate', or 'inodes evaluate'.
 Examples:
   inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ > my-pipeline.json
   inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ | inodes save --name "Copy" -
+  inodes save my-pipeline.json --id 01KM2XGX2RPYRQ9F7V2ZP3F5TQ   # update in place
   inodes export 01KM2XGX2RPYRQ9F7V2ZP3F5TQ -o my-pipeline.json`,
 		Args:              cobra.ExactArgs(1),
 		RunE:              runExport,

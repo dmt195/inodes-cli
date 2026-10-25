@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/dmt195/inodes-cli/internal/client"
@@ -67,9 +68,17 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// readPipelineJSON reads a pipeline JSON file and wraps it in {"pipeline": ...}
+// readPipelineJSON reads a pipeline JSON file (or stdin when path is "-")
+// and wraps it in {"pipeline": ...}
 func readPipelineJSON(path string) (map[string]any, error) {
-	data, err := os.ReadFile(path)
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(os.Stdin)
+		path = "stdin"
+	} else {
+		data, err = os.ReadFile(path)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}

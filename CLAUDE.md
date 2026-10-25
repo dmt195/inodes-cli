@@ -37,5 +37,6 @@ This is a CLI for the Image Nodes image processing API, built with Cobra and Go 
 
 - The `run` command has dual modes: interactive (prompts for missing params via huh forms) and CI/CD (`--no-prompt` uses flags and defaults only).
 - Image parameters can be local file paths (auto-uploaded as ephemeral assets) or existing asset UUIDs.
+- `save` has two modes: without `--id` it POSTs to `/api/v1/pipeline/save` (creates a new pipeline, `--name` required); with `--id` it PUTs to `/api/v1/pipelines/{id}` (replaces only the graph; name/description unchanged; optional `--expected-version` for optimistic locking, 409 on mismatch). The MCP `save_pipeline` tool mirrors this via optional `pipeline_id`/`version` args. Pipeline file args accept `-` for stdin.
 - Version is injected at build time via `-ldflags "-X main.version=$(VERSION)"`.
 - `action.yaml` defines a GitHub Action composite step that installs the CLI and verifies auth.

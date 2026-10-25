@@ -199,3 +199,20 @@ type SavePipelineResponse struct {
 	EvaluateURL string `json:"evaluate_url"`
 	DescribeURL string `json:"describe_url"`
 }
+
+// UpdatePipelineRequest is the request body for replacing an existing
+// pipeline's graph. Version is an optional optimistic lock: 0 (omitted)
+// overwrites unconditionally; >0 makes the server reject the update with
+// 409 if the stored version differs.
+type UpdatePipelineRequest struct {
+	Pipeline map[string]any `json:"pipeline"`
+	Version  int            `json:"version,omitempty"`
+}
+
+// UpdatePipelineResponse is the data payload from updating a pipeline
+type UpdatePipelineResponse struct {
+	ID          string `json:"id"`
+	Version     int    `json:"version"`
+	EvaluateURL string `json:"evaluate_url"`
+	DescribeURL string `json:"describe_url"`
+}
