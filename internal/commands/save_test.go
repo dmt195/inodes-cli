@@ -28,7 +28,12 @@ type recordedRequest struct {
 // request it received plus captured stdout/stderr.
 func runSaveCmd(t *testing.T, handler func(w http.ResponseWriter), args ...string) (*recordedRequest, string, string, error) {
 	t.Helper()
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Keep the developer's real config out of reach (on macOS
+	// os.UserConfigDir ignores XDG_CONFIG_HOME and uses $HOME).
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("APPDATA", home)
 	t.Setenv("INODES_API_KEY", "")
 	t.Setenv("INODES_BASE_URL", "")
 

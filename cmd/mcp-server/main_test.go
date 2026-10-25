@@ -21,7 +21,12 @@ func callSave(t *testing.T, args map[string]any) (method, path string, body map[
 		io.WriteString(w, `{"error": false, "message": "ok", "data": {"id": "01EXIST", "version": 2, "evaluate_url": "/e", "describe_url": "/d"}}`)
 	}))
 	t.Cleanup(ts.Close)
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Keep the developer's real config out of reach (on macOS
+	// os.UserConfigDir ignores XDG_CONFIG_HOME and uses $HOME).
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("APPDATA", home)
 	t.Setenv("INODES_API_KEY", "test-key")
 	t.Setenv("INODES_BASE_URL", ts.URL)
 

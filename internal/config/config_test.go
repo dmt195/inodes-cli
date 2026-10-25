@@ -1,12 +1,33 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
+// isolateConfig points os.UserConfigDir at a temp directory so tests never
+// read or overwrite the developer's real config. XDG_CONFIG_HOME alone is not
+// enough: on macOS UserConfigDir ignores it and uses $HOME/Library/Application Support.
+func isolateConfig(t *testing.T) string {
+	t.Helper()
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
+	t.Setenv("APPDATA", filepath.Join(tmp, "AppData"))
+
+	dir, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if !strings.HasPrefix(dir, tmp) {
+		t.Fatalf("config path %q escaped the test temp dir %q", dir, tmp)
+	}
+	return tmp
+}
+
 func TestLoad_Defaults(t *testing.T) {
+	isolateConfig(t)
 	// Clear env vars so they don't interfere
 	t.Setenv("INODES_API_KEY", "")
 	t.Setenv("INODES_BASE_URL", "")
@@ -16,13 +37,16 @@ func TestLoad_Defaults(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	// BaseURL should be non-empty (either from config file or default)
-	if cfg.BaseURL == "" {
-		t.Error("expected non-empty base URL")
+	if cfg.BaseURL != "https://imagenodes.com" {
+		t.Errorf("expected default base URL, got %q", cfg.BaseURL)
+	}
+	if cfg.APIKey != "" {
+		t.Errorf("expected empty API key, got %q", cfg.APIKey)
 	}
 }
 
 func TestLoad_EnvOverride(t *testing.T) {
+	isolateConfig(t)
 	t.Setenv("INODES_API_KEY", "env-key-123")
 	t.Setenv("INODES_BASE_URL", "http://localhost:8081")
 
@@ -40,6 +64,7 @@ func TestLoad_EnvOverride(t *testing.T) {
 }
 
 func TestLoad_FlagOverride(t *testing.T) {
+	isolateConfig(t)
 	t.Setenv("INODES_API_KEY", "env-key")
 
 	cfg, err := Load("flag-key", "http://flag-url")
@@ -56,25 +81,23 @@ func TestLoad_FlagOverride(t *testing.T) {
 }
 
 func TestSaveAndLoad(t *testing.T) {
-	// Override config path for testing
-	tmpDir := t.TempDir()
-	origConfigPath := configPath
-	_ = origConfigPath // configPath is a function, not easily overridable
+	isolateConfig(t)
+	t.Setenv("INODES_API_KEY", "")
+	t.Setenv("INODES_BASE_URL", "")
 
-	// Test Save with a known config
-	cfg := &Config{
-		APIKey:  "test-key-save",
-		BaseURL: "http://test.local",
+	if err := Save(&Config{APIKey: "test-key-save", BaseURL: "http://test.local"}); err != nil {
+		t.Fatalf("Save failed: %v", err)
 	}
 
-	// Manually save to temp dir
-	dir := filepath.Join(tmpDir, configDir)
-	os.MkdirAll(dir, 0700)
-
-	if err := Save(cfg); err != nil {
-		// Save will use the real config path, which is fine for the test
-		// Just verify it doesn't panic
-		t.Logf("Save returned error (expected if config dir not writable): %v", err)
+	cfg, err := Load("", "")
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.APIKey != "test-key-save" {
+		t.Errorf("expected saved API key, got %q", cfg.APIKey)
+	}
+	if cfg.BaseURL != "http://test.local" {
+		t.Errorf("expected saved base URL, got %q", cfg.BaseURL)
 	}
 }
 
