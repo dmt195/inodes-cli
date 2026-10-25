@@ -73,6 +73,15 @@ func (c *Client) post(path string, body []byte) (*http.Response, error) {
 	return c.do(req)
 }
 
+func (c *Client) put(path string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPut, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return c.do(req)
+}
+
 // decodeJSON reads the response body and decodes the JSON response.
 // It returns the raw Data field for further unmarshaling.
 func decodeJSON(resp *http.Response) (json.RawMessage, error) {

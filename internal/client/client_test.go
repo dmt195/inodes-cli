@@ -2,11 +2,13 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -373,5 +375,160 @@ func TestAPIError_NotFound(t *testing.T) {
 	_, err := c.DescribePipeline("nonexistent")
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestSavePipeline_CreatesViaPOST(t *testing.T) {
+	ts := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/api/v1/pipeline/save" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		var req SavePipelineRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decoding body: %v", err)
+		}
+		if req.Name != "My Pipe" || req.Description != "desc" {
+			t.Errorf("unexpected name/description: %q / %q", req.Name, req.Description)
+		}
+		if _, ok := req.Pipeline["nodes"]; !ok {
+			t.Errorf("expected pipeline.nodes in body, got %v", req.Pipeline)
+		}
+		writeJSONResponse(w, http.StatusOK, map[string]any{
+			"id":           "01NEW",
+			"name":         "My Pipe",
+			"evaluate_url": "/api/v1/pipelines/01NEW/evaluate",
+			"describe_url": "/api/v1/pipelines/01NEW/describe",
+		})
+	})
+	defer ts.Close()
+
+	c := New(ts.URL, "test-key")
+	res, err := c.SavePipeline("My Pipe", "desc", map[string]any{"nodes": map[string]any{}})
+	if err != nil {
+		t.Fatalf("SavePipeline failed: %v", err)
+	}
+	if res.ID != "01NEW" {
+		t.Errorf("unexpected ID %q", res.ID)
+	}
+}
+
+func TestUpdatePipeline_SendsPUT(t *testing.T) {
+	tests := []struct {
+		name        string
+		version     int
+		wantVersion bool
+	}{
+		{"unconditional overwrite omits version", 0, false},
+		{"optimistic lock sends version", 7, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPut {
+					t.Errorf("expected PUT, got %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/pipelines/01EXIST" {
+					t.Errorf("unexpected path: %s", r.URL.Path)
+				}
+				if r.Header.Get("X-API-Key") != "test-key" {
+					t.Errorf("missing API key header")
+				}
+				if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+					t.Errorf("unexpected content type %q", ct)
+				}
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatalf("decoding body: %v", err)
+				}
+				for _, k := range []string{"name", "description"} {
+					if _, ok := body[k]; ok {
+						t.Errorf("update body must not include %q", k)
+					}
+				}
+				p, ok := body["pipeline"].(map[string]any)
+				if !ok {
+					t.Fatalf("expected pipeline object, got %v", body["pipeline"])
+				}
+				if _, ok := p["pipeline"]; ok {
+					t.Errorf("pipeline must not be double-wrapped: %v", p)
+				}
+				if p["id"] != "stale-id-from-export" {
+					t.Errorf("expected graph to be passed through unchanged, got %v", p)
+				}
+				v, has := body["version"]
+				if has != tt.wantVersion {
+					t.Errorf("version present=%v, want %v (body=%v)", has, tt.wantVersion, body)
+				}
+				if tt.wantVersion && v != float64(tt.version) {
+					t.Errorf("expected version %d, got %v", tt.version, v)
+				}
+				writeJSONResponse(w, http.StatusOK, map[string]any{
+					"id":           "01EXIST",
+					"version":      8,
+					"evaluate_url": "/api/v1/pipelines/01EXIST/evaluate",
+					"describe_url": "/api/v1/pipelines/01EXIST/describe",
+				})
+			})
+			defer ts.Close()
+
+			c := New(ts.URL, "test-key")
+			graph := map[string]any{"id": "stale-id-from-export", "nodes": map[string]any{}}
+			res, err := c.UpdatePipeline("01EXIST", graph, tt.version)
+			if err != nil {
+				t.Fatalf("UpdatePipeline failed: %v", err)
+			}
+			if res.ID != "01EXIST" || res.Version != 8 {
+				t.Errorf("unexpected result: %+v", res)
+			}
+			if res.EvaluateURL != "/api/v1/pipelines/01EXIST/evaluate" {
+				t.Errorf("unexpected evaluate URL %q", res.EvaluateURL)
+			}
+		})
+	}
+}
+
+func TestUpdatePipeline_Errors(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   int
+		message  string
+		wantIs   error
+		contains []string
+	}{
+		{"conflict", http.StatusConflict, "version mismatch: expected 3, current 5", ErrVersionConflict,
+			[]string{"API error (409)", "version mismatch", "inodes export 01EXIST"}},
+		{"not found", http.StatusNotFound, "pipeline not found", ErrPipelineNotFound,
+			[]string{"API error (404)", "01EXIST", "inodes list"}},
+		{"forbidden", http.StatusForbidden, "pipeline is locked", nil,
+			[]string{"API error (403)", "pipeline is locked"}},
+		{"validation", http.StatusUnprocessableEntity, "pipeline validation failed", nil,
+			[]string{"API error (422)", "validation failed"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+				json.NewEncoder(w).Encode(map[string]any{"error": true, "message": tt.message})
+			})
+			defer ts.Close()
+
+			c := New(ts.URL, "test-key")
+			_, err := c.UpdatePipeline("01EXIST", map[string]any{}, 3)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if tt.wantIs != nil && !errors.Is(err, tt.wantIs) {
+				t.Errorf("expected errors.Is(%v), got %v", tt.wantIs, err)
+			}
+			for _, want := range tt.contains {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q missing %q", err.Error(), want)
+				}
+			}
+		})
 	}
 }

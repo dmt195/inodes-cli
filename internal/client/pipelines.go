@@ -3,9 +3,11 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 // ListPipelines returns the user's pipelines with pagination
@@ -211,4 +213,68 @@ func (lr *limitedReader) Read(p []byte) (int, error) {
 	n, err := lr.r.Read(p)
 	lr.remaining -= int64(n)
 	return n, err
+}
+
+// ErrPipelineNotFound is returned (wrapped) when the server reports 404 for a
+// pipeline-scoped request.
+var ErrPipelineNotFound = errors.New("pipeline not found")
+
+// ErrVersionConflict is returned (wrapped) when an optimistic-locked update is
+// rejected because the stored pipeline version has moved on.
+var ErrVersionConflict = errors.New("version conflict")
+
+// UpdatePipeline replaces the graph of an existing pipeline in place via
+// PUT /api/v1/pipelines/{id}. Only the graph is replaced; the pipeline's name
+// and description are left unchanged. version > 0 enables optimistic locking.
+// The server uses the URL id, so any "id" inside the graph is ignored.
+func (c *Client) UpdatePipeline(id string, pipeline map[string]any, version int) (*UpdatePipelineResponse, error) {
+	body, err := json.Marshal(UpdatePipelineRequest{Pipeline: pipeline, Version: version})
+	if err != nil {
+		return nil, fmt.Errorf("encoding update request: %w", err)
+	}
+
+	resp, err := c.put("/api/v1/pipelines/"+url.PathEscape(id), body)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		serverMessage(resp) // drain and close
+		return nil, fmt.Errorf("API error (404): %w: %s. Check the ID with 'inodes list'", ErrPipelineNotFound, id)
+	case http.StatusConflict:
+		msg := serverMessage(resp)
+		if msg == "" {
+			msg = "pipeline was modified since the expected version"
+		}
+		return nil, fmt.Errorf("API error (409): %w: %s. Re-export the latest version with 'inodes export %s', re-apply your changes, and try again", ErrVersionConflict, msg, id)
+	}
+
+	data, err := decodeJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result UpdatePipelineResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing update result: %w", err)
+	}
+	return &result, nil
+}
+
+// serverMessage reads and closes the response body, returning the "message"
+// field of the standard {"error", "message"} envelope if present.
+func serverMessage(resp *http.Response) string {
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+	var env struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &env) != nil {
+		return ""
+	}
+	return env.Message
 }

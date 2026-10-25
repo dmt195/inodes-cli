@@ -214,6 +214,14 @@ func PrintSaveResult(r *client.SavePipelineResponse) {
 	fmt.Printf("  %s Describe: %s\n", tui.SymbolArrow, r.DescribeURL)
 }
 
+// PrintUpdateResult prints the result of updating an existing pipeline's graph
+func PrintUpdateResult(r *client.UpdatePipelineResponse) {
+	fmt.Printf("%s Pipeline updated: %s\n", tui.SymbolCheck, tui.Bold.Render(r.ID))
+	fmt.Printf("  %s Version:  %d\n", tui.SymbolArrow, r.Version)
+	fmt.Printf("  %s Evaluate: %s\n", tui.SymbolArrow, r.EvaluateURL)
+	fmt.Printf("  %s Describe: %s\n", tui.SymbolArrow, r.DescribeURL)
+}
+
 // PrintPipelineExport prints a human-readable summary of an exported pipeline
 func PrintPipelineExport(p *client.PipelineFull) {
 	fmt.Println(tui.Title.Render(p.Name))
