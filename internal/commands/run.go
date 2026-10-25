@@ -172,6 +172,9 @@ func runPipeline(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	fmt.Fprintln(os.Stderr, tui.SymbolCheck)
+	for _, w := range report.Warnings {
+		fmt.Fprintf(os.Stderr, "Warning [%s] %s: %s\n", w.Code, w.NodeName, w.Message)
+	}
 
 	// 7. Output results
 	if asJSON {

@@ -93,6 +93,7 @@ type PipelineReport struct {
 	TotalProcessingTime time.Duration            `json:"total_processing_time"`
 	TotalUnitsBillable  int                      `json:"total_processing_units"`
 	NodesPerformance    []NodePerfEntry          `json:"nodes_performance,omitempty"`
+	Warnings            []RunWarning             `json:"warnings,omitempty"`
 }
 
 // OutputDetails holds the result image info for one named output.
@@ -184,11 +185,34 @@ type ValidationError struct {
 
 // EvaluateJSONResponse is the response from the pipeline/evaluate endpoint
 type EvaluateJSONResponse struct {
-	Success  bool           `json:"success"`
-	Output   string         `json:"output,omitempty"`
-	Cost     int            `json:"cost"`
-	Error    string         `json:"error,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Success bool   `json:"success"`
+	Output  string `json:"output,omitempty"`
+	// Outputs holds every output image as base64, keyed by output name.
+	Outputs   map[string]string `json:"outputs,omitempty"`
+	Cost      int               `json:"cost"`
+	Error     string            `json:"error,omitempty"`
+	NodeError *NodeError        `json:"node_error,omitempty"`
+	Warnings  []RunWarning      `json:"warnings,omitempty"`
+	Metadata  map[string]any    `json:"metadata,omitempty"`
+}
+
+// NodeError identifies the node that made a run fail.
+type NodeError struct {
+	Code     string `json:"code"`
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name"`
+	NodeType string `json:"node_type"`
+	Reason   string `json:"reason"`
+}
+
+// RunWarning is a problem that didn't stop a run but probably made its
+// output wrong, such as text in a font that lacks its characters.
+type RunWarning struct {
+	Code     string `json:"code"`
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name"`
+	NodeType string `json:"node_type"`
+	Message  string `json:"message"`
 }
 
 // EstimateCostResponse is the response from the pipeline/estimate-cost endpoint
