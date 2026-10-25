@@ -54,6 +54,10 @@ func main() {
 	root.AddCommand(commands.NewDiffCmd())
 	root.AddCommand(commands.NewExportCmd())
 	root.AddCommand(commands.NewDeleteCmd())
+	root.AddCommand(commands.NewSetCmd())
+	root.AddCommand(commands.NewVersionsCmd())
+	root.AddCommand(commands.NewRestoreCmd())
+	root.AddCommand(commands.NewAssetCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version",

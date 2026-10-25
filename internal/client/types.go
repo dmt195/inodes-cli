@@ -44,6 +44,8 @@ type PipelineFull struct {
 	PipelineData map[string]any `json:"pipeline_data,omitempty"`
 	IsFavourite  bool           `json:"is_favourite"`
 	IsLocked     bool           `json:"is_locked"`
+	// Version is the pipeline's current version, for optimistic locking.
+	Version int `json:"version,omitempty"`
 }
 
 // PipelineFullResponse wraps PipelineFull for endpoints that return extra fields
