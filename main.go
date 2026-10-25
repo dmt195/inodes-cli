@@ -46,6 +46,7 @@ func main() {
 	root.AddCommand(commands.NewUploadCmd())
 	root.AddCommand(commands.NewUploadDeleteCmd())
 	root.AddCommand(commands.NewSchemaCmd())
+	root.AddCommand(commands.NewFontsCmd())
 	root.AddCommand(commands.NewValidateCmd())
 	root.AddCommand(commands.NewEstimateCmd())
 	root.AddCommand(commands.NewEvaluateCmd())

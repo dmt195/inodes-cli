@@ -131,25 +131,36 @@ type EphemeralUploadResponse struct {
 
 // NodeSchema describes an available node type and its parameters
 type NodeSchema struct {
-	Type        string         `json:"type"`
-	Description string         `json:"description,omitempty"`
-	Category    string         `json:"category,omitempty"`
-	Inputs      []NodeInput    `json:"inputs,omitempty"`
-	Outputs     []NodeOutput   `json:"outputs,omitempty"`
-	Properties  map[string]any `json:"properties,omitempty"`
+	Type        string          `json:"type"`
+	DisplayName string          `json:"display_name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Category    string          `json:"category,omitempty"`
+	Inputs      []NodeConnector `json:"inputs,omitempty"`
+	Outputs     []NodeConnector `json:"outputs,omitempty"`
+	Parameters  []NodeParameter `json:"parameters,omitempty"`
+	Examples    []string        `json:"examples,omitempty"`
 }
 
-// NodeInput describes a node input slot
-type NodeInput struct {
-	Name     string `json:"name"`
-	DataType string `json:"data_type"`
-	Required bool   `json:"required"`
+// NodeConnector describes a node input or output connector
+type NodeConnector struct {
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Required     bool   `json:"required"`
+	Description  string `json:"description,omitempty"`
+	IsPixelSpace bool   `json:"is_pixel_space,omitempty"`
 }
 
-// NodeOutput describes a node output slot
-type NodeOutput struct {
-	Name     string `json:"name"`
-	DataType string `json:"data_type"`
+// NodeParameter describes a configurable node parameter. Enum lists the
+// accepted values for parameters such as fonts and blend modes.
+type NodeParameter struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	Default      any      `json:"default,omitempty"`
+	Min          *float64 `json:"min,omitempty"`
+	Max          *float64 `json:"max,omitempty"`
+	Description  string   `json:"description"`
+	IsPixelSpace bool     `json:"is_pixel_space,omitempty"`
+	Enum         []string `json:"enum,omitempty"`
 }
 
 // SchemaNodesResponse is the response from the schema/nodes endpoint

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -165,15 +166,86 @@ func PrintNodeSchemas(schema *client.SchemaNodesResponse) {
 		fmt.Println(tui.Subtitle.Render(fmt.Sprintf("── %s ──", cat)))
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		for _, n := range nodes {
-			desc := n.Description
-			if len(desc) > 60 {
-				desc = desc[:57] + "..."
-			}
-			fmt.Fprintf(w, "  %s\t%s\n", tui.Bold.Render(n.Type), desc)
+			fmt.Fprintf(w, "  %s\t%s\n", tui.Bold.Render(n.Type), n.Description)
 		}
 		w.Flush()
 		fmt.Println()
 	}
+}
+
+// PrintNodeSchema prints one node type's inputs, outputs and parameters.
+func PrintNodeSchema(n *client.NodeSchema) {
+	title := n.Type
+	if n.DisplayName != "" {
+		title = fmt.Sprintf("%s (%s)", n.DisplayName, n.Type)
+	}
+	fmt.Println(tui.Title.Render(title))
+	if n.Description != "" {
+		fmt.Println(n.Description)
+	}
+
+	printConnectors := func(heading string, cs []client.NodeConnector) {
+		if len(cs) == 0 {
+			return
+		}
+		fmt.Println()
+		fmt.Println(tui.Subtitle.Render("── " + heading + " ──"))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		for _, c := range cs {
+			req := ""
+			if c.Required {
+				req = "required"
+			}
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", tui.Bold.Render(c.Name), c.Type, req, c.Description)
+		}
+		w.Flush()
+	}
+	printConnectors("Inputs", n.Inputs)
+	printConnectors("Outputs", n.Outputs)
+
+	if len(n.Parameters) > 0 {
+		fmt.Println()
+		fmt.Println(tui.Subtitle.Render("── Parameters ──"))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		for _, p := range n.Parameters {
+			var details []string
+			if p.Default != nil && p.Default != "" {
+				details = append(details, "default "+formatDefault(p.Default))
+			}
+			if p.Min != nil && p.Max != nil {
+				details = append(details, fmt.Sprintf("%g to %g", *p.Min, *p.Max))
+			}
+			if p.IsPixelSpace {
+				details = append(details, "pixels")
+			}
+			desc := p.Description
+			if len(p.Enum) > 0 {
+				desc += " (one of: " + strings.Join(p.Enum, ", ") + ")"
+			}
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", tui.Bold.Render(p.Name), p.Type, strings.Join(details, ", "), desc)
+		}
+		w.Flush()
+	}
+
+	if len(n.Examples) > 0 {
+		fmt.Println()
+		fmt.Println(tui.Subtitle.Render("── Examples ──"))
+		for _, e := range n.Examples {
+			fmt.Printf("  %s %s\n", tui.SymbolArrow, e)
+		}
+	}
+}
+
+// formatDefault renders a parameter default, showing sizes as "W x H".
+func formatDefault(v any) string {
+	if m, ok := v.(map[string]any); ok {
+		if w, okW := m["width"]; okW {
+			if h, okH := m["height"]; okH {
+				return fmt.Sprintf("%v x %v", w, h)
+			}
+		}
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 // PrintValidateResult prints pipeline validation results
